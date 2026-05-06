@@ -11,9 +11,29 @@ const MAX_CHUNKS = 4;
 const MIN_CHUNK_LEN = 30;
 const SINGLE_CHUNK_THRESHOLD = 220; // se a msg toda for curta, manda 1 só
 
-/** Quebra texto em pedaços naturais. */
-export function splitForHuman(text: string): string[] {
-  const trimmed = text.trim();
+/**
+ * WhatsApp usa markdown próprio: *negrito*, _italico_, ~tachado~, ```mono```.
+ * O modelo tende a usar markdown padrão (** **). Sanitiza antes de mandar.
+ */
+function sanitizeForWhatsApp(text: string): string {
+  return text
+    // **negrito** -> *negrito* (preserva pelo menos 1 char dentro)
+    .replace(/\*\*(.+?)\*\*/gs, '*$1*')
+    // __palavra__ -> _palavra_  (markdown bold com _ vira italico)
+    .replace(/__(.+?)__/gs, '_$1_')
+    // ~~tachado~~ -> ~tachado~
+    .replace(/~~(.+?)~~/gs, '~$1~')
+    // links Markdown [texto](url) -> texto (url)
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$1 ($2)')
+    // Cabeçalhos Markdown (# ## ###) viram negrito do WhatsApp
+    .replace(/^(#{1,6})\s+(.+)$/gm, '*$2*')
+    // Bullets com '- ' viram '• ' (mais limpo no WhatsApp)
+    .replace(/^(\s*)-\s+/gm, '$1• ');
+}
+
+/** Quebra texto em pedaços naturais (já sanitizado para WhatsApp). */
+export function splitForHuman(rawText: string): string[] {
+  const trimmed = sanitizeForWhatsApp(rawText).trim();
   if (!trimmed) return [];
 
   // Texto curto vai inteiro

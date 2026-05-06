@@ -74,6 +74,94 @@ export async function vaccinesRoutes(app: FastifyInstance): Promise<void> {
     return reply.code(204).send();
   });
 
+  // ─────────────── IMPORT CSV (em lote) ───────────────
+  // Aceita rows: [{ name, description?, ageMonths?, priceCash, priceInstallment?,
+  // installments?, active? }] e faz upsert por slug (gerado a partir do nome).
+  const importBody = z.object({
+    rows: z
+      .array(
+        z.object({
+          name: z.string().min(1),
+          slug: z.string().optional(),
+          description: z.string().optional(),
+          ageMonths: z.array(z.number().int().nonnegative()).optional(),
+          priceCash: z.number().nonnegative(),
+          priceInstallment: z.number().nonnegative().optional(),
+          installments: z.number().int().positive().optional(),
+          active: z.boolean().optional(),
+        }),
+      )
+      .min(1)
+      .max(500),
+  });
+
+  app.post('/import', async (req, reply) => {
+    if (req.session!.role !== 'admin')
+      return reply.code(403).send({ error: 'forbidden' });
+    const tenantId = req.session!.tenantId;
+    const body = importBody.parse(req.body);
+
+    const slugify = (s: string) =>
+      s
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
+    let created = 0;
+    let updated = 0;
+    const errors: Array<{ row: number; error: string }> = [];
+
+    for (let i = 0; i < body.rows.length; i++) {
+      const r = body.rows[i]!;
+      try {
+        const slug = r.slug?.trim() || slugify(r.name);
+        const installments = r.installments ?? 3;
+        const priceInstallment = r.priceInstallment ?? Number((r.priceCash * 1.07).toFixed(2));
+        const ageMonths = r.ageMonths ?? [];
+
+        const existing = await prisma.vaccine.findFirst({
+          where: { tenantId, slug },
+        });
+        if (existing) {
+          await prisma.vaccine.update({
+            where: { id: existing.id },
+            data: {
+              name: r.name,
+              description: r.description ?? existing.description,
+              ageMonths,
+              priceCash: r.priceCash,
+              priceInstallment,
+              installments,
+              active: r.active ?? existing.active,
+            },
+          });
+          updated++;
+        } else {
+          await prisma.vaccine.create({
+            data: {
+              tenantId,
+              name: r.name,
+              slug,
+              description: r.description ?? r.name,
+              ageMonths,
+              priceCash: r.priceCash,
+              priceInstallment,
+              installments,
+              active: r.active ?? true,
+            },
+          });
+          created++;
+        }
+      } catch (err) {
+        errors.push({ row: i + 1, error: (err as Error).message });
+      }
+    }
+
+    return { created, updated, errors, total: body.rows.length };
+  });
+
   app.get('/packages', async (req) => {
     const tenantId = req.session!.tenantId;
     const packages = await prisma.vaccinePackage.findMany({

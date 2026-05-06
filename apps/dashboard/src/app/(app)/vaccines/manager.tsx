@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { Baby, Check, Pencil, Plus, Sparkles, Syringe, Trash2, X } from 'lucide-react';
+import { Baby, Check, Pencil, Plus, Sparkles, Syringe, Trash2, Upload, X } from 'lucide-react';
+import { VaccinesImportModal } from './import-modal';
 import { api } from '@/lib/api-client';
 import type { Vaccine, VaccinePackage } from '@/lib/types';
 
@@ -74,6 +75,7 @@ export function VaccinesManager({
   packages: VaccinePackage[];
 }) {
   const [vaccines, setVaccines] = useState(initial);
+  const [showImport, setShowImport] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [panelOpen, setPanelOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -195,14 +197,24 @@ export function VaccinesManager({
               {vaccines.length}
             </span>
           </h2>
-          <button
-            onClick={startNew}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-brand-deep"
-          >
-            <Plus className="h-4 w-4" />
-            Nova vacina
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowImport(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-brand/30 hover:text-brand-deep"
+            >
+              <Upload className="h-4 w-4" />
+              Importar CSV
+            </button>
+            <button
+              onClick={startNew}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white shadow-card transition hover:bg-brand-deep"
+            >
+              <Plus className="h-4 w-4" />
+              Nova vacina
+            </button>
+          </div>
         </div>
+        {showImport && <VaccinesImportModal onClose={() => setShowImport(false)} />}
 
         {vaccines.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-12 text-center text-sm text-slate-500">

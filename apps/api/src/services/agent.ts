@@ -6,6 +6,11 @@ import { functionHandlers, type FunctionContext } from './functions.js';
 import { ai } from './openai.js';
 import { sendHumanized } from './humanizedSend.js';
 import { getTenantConfig } from './tenant.js';
+import {
+  isWithinBusinessHours,
+  nextBusinessOpeningLabel,
+  type BusinessHoursConfig,
+} from './businessHours.js';
 import { prisma } from '@imuniza/db';
 
 const MAX_TOOL_ITERATIONS = 5;
@@ -41,12 +46,34 @@ export async function runAgent(input: RunAgentInput): Promise<void> {
     currentDate: new Date().toISOString().slice(0, 10),
   });
 
+  // Contexto de horário: a IA continua atendendo, mas precisa saber se
+  // está dentro do expediente para informar previsão de retorno da equipe.
+  const businessHours = personaConfig.businessHours as BusinessHoursConfig | undefined;
+  const inBusinessHours = isWithinBusinessHours(businessHours);
+  const nextOpening = inBusinessHours ? null : nextBusinessOpeningLabel(businessHours);
+  const tz = businessHours?.timezone ?? 'America/Sao_Paulo';
+  const localTime = new Intl.DateTimeFormat('pt-BR', {
+    timeZone: tz,
+    hour: '2-digit',
+    minute: '2-digit',
+    weekday: 'long',
+    day: '2-digit',
+    month: 'short',
+  }).format(new Date());
+
+  const businessContext = inBusinessHours
+    ? `Estamos dentro do horário comercial. A equipe pode confirmar agendamentos AGORA ao receber o handoff.`
+    : `**Estamos FORA do horário comercial** (agora: ${localTime}). Continue atendendo normalmente o paciente — informe, oriente, registre o perfil. ` +
+      `Quando o paciente quiser agendar, mencione com cuidado que a equipe humana retorna ${nextOpening} para confirmar o horário, e ainda assim use \`request_handoff\` para deixar registrado. ` +
+      `NÃO recuse perguntas só porque é noite/fim de semana — você está aqui justamente para acolher fora do expediente.`;
+
   const messages: ChatMessage[] = [
     { role: 'system', content: system },
     {
       role: 'system',
       content: `Perfil atual do paciente (JSON): ${JSON.stringify(profile)}. Telefone: ${input.patientPhone}.`,
     },
+    { role: 'system', content: businessContext },
     // Filtra mensagens 'tool' do historico: elas sao resultados de
     // function calling intermedios. Nao salvamos o assistant.tool_calls
     // que as referencia, entao se mandassemos a 'tool' sozinha a OpenAI

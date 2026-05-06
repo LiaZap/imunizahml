@@ -195,8 +195,11 @@ async function main() {
     persona: PERSONA,
     greeting: GREETING,
     businessHours: { start: '08:00', end: '18:00', timezone: 'America/Sao_Paulo' },
+    // silentHours desabilitado por padrão: a IA atende 24/7. O contexto
+    // de horário é injetado no system prompt e a IA informa o paciente
+    // sobre o próximo expediente da equipe humana quando precisar.
     silentHours: {
-      enabled: true,
+      enabled: false,
       start: '20:00',
       end: '08:00',
       offlineMessage: OFFLINE_MESSAGE,

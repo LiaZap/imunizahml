@@ -110,6 +110,10 @@ export const functionHandlers: Record<
     return {
       name: 'list_vaccines',
       output: JSON.stringify({
+        // priceCash JA EH o valor com desconto a vista (PIX/dinheiro).
+        // priceInstallment eh o TOTAL parcelado em ate `installments` vezes.
+        priceCashMeaning: 'a vista (dinheiro ou PIX) — preço final, ja com desconto',
+        priceInstallmentMeaning: 'total parcelado no cartao em ate `installments` vezes',
         vaccines: filtered.map((v) => ({
           name: v.name,
           slug: v.slug,
@@ -148,10 +152,15 @@ export const functionHandlers: Record<
       name: 'recommend_vaccines',
       output: JSON.stringify({
         ageMonths,
+        // priceCash JA EH o valor com desconto a vista (PIX/dinheiro). NAO eh "desconto adicional".
+        // priceInstallment eh o TOTAL parcelado no cartao em ate `installments` vezes.
+        priceCashMeaning: 'a vista (dinheiro ou PIX) — preço final, ja com desconto',
+        priceInstallmentMeaning: 'total parcelado no cartao em ate `installments` vezes',
         recommended: recommended.map((v) => ({
           name: v.name,
           priceCash: Number(v.priceCash),
           priceInstallment: Number(v.priceInstallment),
+          installments: v.installments,
           description: v.description,
         })),
         packageAvailable: pkg

@@ -123,11 +123,11 @@ Use como guia para identificar o que perguntar e para contextualizar respostas. 
 (depois que ela responde "2 meses, o Theo")
 "Parabéns pelo Theo! Aos 2 meses as indicadas são:
 
-• *Hexavalente* R$ 256,00 à vista (dinheiro ou PIX), ou R$ 314,27 podendo parcelar em até 12x
-• *Pneumocócica 20* R$ 489,00 à vista (dinheiro ou PIX), ou R$ 600,31 podendo parcelar em até 12x
-• *Rotavírus pentavalente* R$ 312,00 à vista (dinheiro ou PIX), ou R$ 383,02 podendo parcelar em até 12x
+• *Hexavalente* R$ 256,00 à vista (dinheiro ou PIX), ou R$ 314,27 podendo parcelar em até 18x
+• *Pneumocócica 20* R$ 489,00 à vista (dinheiro ou PIX), ou R$ 600,31 podendo parcelar em até 18x
+• *Rotavírus pentavalente* R$ 312,00 à vista (dinheiro ou PIX), ou R$ 383,02 podendo parcelar em até 18x
 
-Temos também o *Pacote 2 a 6 meses* que cobre todas as doses até os 6 meses — R$ 5.067,00 à vista (dinheiro ou PIX), ou R$ 6.453,54 em até 12x.
+Temos também o *Pacote 2 a 6 meses* que cobre todas as doses até os 6 meses — R$ 5.067,00 à vista (dinheiro ou PIX), ou R$ 6.453,54 em até 18x.
 
 Quer que eu peça pra equipe te ajudar a confirmar um horário?"
 

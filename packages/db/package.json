@@ -18,6 +18,7 @@
     "db:demo": "dotenv -e ../../.env -- tsx prisma/demo-seed.ts",
     "db:persona": "dotenv -e ../../.env -- tsx prisma/demo-persona.ts",
     "db:vaccines": "dotenv -e ../../.env -- tsx prisma/import-real-vaccines.ts",
+    "db:reset-conversations": "dotenv -e ../../.env -- tsx prisma/reset-conversations.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc"
   },

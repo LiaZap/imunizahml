@@ -1,14 +1,17 @@
 'use client';
 
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import {
   BellRing,
   Building2,
+  CalendarDays,
   Check,
   Clock,
+  Copy,
   MessageCircle,
   Moon,
   Plus,
+  RefreshCw,
   Sparkles,
   Trash2,
   Zap,
@@ -41,6 +44,50 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
     initial.config.reminders?.messageTemplate ??
       'Oi {NOME}! 💙 Lembrete do seu agendamento {DATA} às {HORA} para {VACINA}. Qualquer coisa me chama por aqui.',
   );
+
+  const [icalUrl, setIcalUrl] = useState<string | null>(null);
+  const [icalLoading, setIcalLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  // Busca o URL do iCal na 1a renderização
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api<{ url: string | null }>('/calendar/url');
+        if (!cancelled && data?.url) setIcalUrl(data.url);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function regenerateIcalToken() {
+    if (!confirm('Gerar um novo link? O link antigo deixará de funcionar e a secretária precisará atualizar no Google.')) return;
+    setIcalLoading(true);
+    try {
+      const data = await api<{ url: string }>('/calendar/rotate-token', { method: 'POST', body: '{}' });
+      setIcalUrl(data?.url ?? null);
+    } catch (err) {
+      alert(`Falha ao gerar novo link: ${(err as Error).message}`);
+    } finally {
+      setIcalLoading(false);
+    }
+  }
+
+  async function copyIcal() {
+    if (!icalUrl) return;
+    try {
+      await navigator.clipboard.writeText(icalUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* ignore */
+    }
+  }
 
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null);
@@ -193,6 +240,62 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
                 className="input"
               />
             </Field>
+          </div>
+        )}
+      </Section>
+
+      <Section
+        icon={CalendarDays}
+        title="Integração com Google Agenda"
+        description="Cole o link abaixo no Google Agenda da secretária. Todos os agendamentos da plataforma aparecem automaticamente na agenda dela."
+      >
+        {icalUrl ? (
+          <>
+            <Field label="Link iCal (cole no Google Agenda)">
+              <div className="flex items-center gap-2">
+                <input
+                  value={icalUrl}
+                  readOnly
+                  onClick={(e) => (e.target as HTMLInputElement).select()}
+                  className="input flex-1 font-mono text-xs"
+                />
+                <button
+                  type="button"
+                  onClick={copyIcal}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  {copied ? 'Copiado!' : 'Copiar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={regenerateIcalToken}
+                  disabled={icalLoading}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                  title="Gera um novo link (o antigo para de funcionar)"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${icalLoading ? 'animate-spin' : ''}`} />
+                  Novo
+                </button>
+              </div>
+            </Field>
+
+            <div className="rounded-xl border border-brand/20 bg-brand-soft/30 p-4 text-xs text-brand-deep">
+              <p className="mb-2 font-semibold">Como adicionar no Google Agenda:</p>
+              <ol className="list-decimal space-y-1 pl-5">
+                <li>Abre o Google Agenda (calendar.google.com) com a conta da clínica</li>
+                <li>No menu lateral, em <b>"Outros agendas"</b>, clica em <b>"+"</b> → <b>"Inscrever-se via URL"</b></li>
+                <li>Cola o link acima e confirma</li>
+                <li>Pronto! Os agendamentos da plataforma aparecem em poucos minutos</li>
+              </ol>
+              <p className="mt-3 text-[11px] opacity-80">
+                O Google atualiza a cada algumas horas. Para forçar uma atualização, basta abrir o Google Agenda.
+              </p>
+            </div>
+          </>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-200 bg-white px-4 py-3 text-xs text-slate-500">
+            Carregando link…
           </div>
         )}
       </Section>

@@ -238,6 +238,15 @@ async function main() {
       end: '08:00',
       offlineMessage: OFFLINE_MESSAGE,
     },
+    // Lembretes automáticos pelos pacientes: 1 dia antes e 1h antes.
+    reminders: {
+      enabled: true,
+      leadTimesMinutes: [24 * 60, 60], // 24h e 1h antes
+      messageTemplate:
+        'Oi {NOME}! 💙 Lembrete do seu agendamento {DATA} às {HORA} para {VACINA}.\n\n' +
+        'Estamos te esperando aqui na Clínica Imuniza, R. Galvão Costa, 86 — Centro.\n\n' +
+        'Qualquer coisa me chama por aqui.',
+    },
     quickTemplates: QUICK_TEMPLATES,
   };
 

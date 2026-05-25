@@ -18,6 +18,7 @@ import { usersRoutes } from './routes/users.js';
 import { reportsRoutes } from './routes/reports.js';
 import { appointmentsRoutes } from './routes/appointments.js';
 import { instanceRoutes } from './routes/instance.js';
+import { publicCalendarRoutes, adminCalendarRoutes } from './routes/calendar.js';
 import { authGuard } from './plugins/authGuard.js';
 import { startIncomingMessageWorker } from './workers/incomingMessage.js';
 import { startAgentTurnWorker } from './workers/agentTurn.js';
@@ -76,6 +77,8 @@ async function buildServer() {
   await app.register(webhookRoutes, { prefix: '/webhook' });
   await app.register(authRoutes, { prefix: '/auth' });
   await app.register(eventsRoutes, { prefix: '/events' });
+  // Feed iCal público — token na URL. Sem authGuard.
+  await app.register(publicCalendarRoutes, { prefix: '/calendar' });
 
   await app.register(async (instance) => {
     instance.addHook('preHandler', authGuard);
@@ -90,6 +93,7 @@ async function buildServer() {
     await instance.register(reportsRoutes, { prefix: '/reports' });
     await instance.register(appointmentsRoutes, { prefix: '/appointments' });
     await instance.register(instanceRoutes, { prefix: '/instance' });
+    await instance.register(adminCalendarRoutes, { prefix: '/calendar' });
   });
 
   return app;

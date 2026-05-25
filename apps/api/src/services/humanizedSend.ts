@@ -7,9 +7,10 @@ import type { FastifyBaseLogger } from 'fastify';
 import { uazapi } from './uazapi.js';
 import { addMessage } from './conversation.js';
 
-const MAX_CHUNKS = 4;
-const MIN_CHUNK_LEN = 30;
-const SINGLE_CHUNK_THRESHOLD = 220; // se a msg toda for curta, manda 1 só
+const MAX_CHUNKS = 7;
+const MIN_CHUNK_LEN = 18;
+const SINGLE_CHUNK_THRESHOLD = 110; // só envia inteiro se for bem curto e sem quebras
+const LONG_PARAGRAPH = 180; // se um parágrafo passa disso, ainda subdivide por sentença
 
 /**
  * WhatsApp usa markdown próprio: *negrito*, _italico_, ~tachado~, ```mono```.
@@ -36,31 +37,75 @@ export function splitForHuman(rawText: string): string[] {
   const trimmed = sanitizeForWhatsApp(rawText).trim();
   if (!trimmed) return [];
 
-  // Texto curto vai inteiro
-  if (trimmed.length < SINGLE_CHUNK_THRESHOLD && !trimmed.includes('\n\n')) {
+  const hasBullets = /(^|\n)\s*•\s+/.test(trimmed);
+
+  // Texto bem curto, sem quebras nem bullets → 1 mensagem só
+  if (trimmed.length < SINGLE_CHUNK_THRESHOLD && !trimmed.includes('\n\n') && !hasBullets) {
     return [trimmed];
   }
 
-  // 1ª tentativa: quebrar por parágrafos
+  // 1ª camada: split por parágrafos (\n\n+)
   let parts = trimmed
     .split(/\n\n+/)
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // Se ainda for 1 só parágrafo mas longo, quebra por sentença
-  if (parts.length === 1 && trimmed.length > 320) {
-    parts = trimmed
-      .split(/(?<=[.!?])\s+(?=[A-ZÀ-Ú])/)
-      .map((s) => s.trim())
-      .filter(Boolean);
+  // 2ª camada: dentro de cada parágrafo, se houver bullets, cada bullet vira sub-parte
+  const afterBullets: string[] = [];
+  for (const p of parts) {
+    if (/(^|\n)\s*•\s+/.test(p)) {
+      // Separa o texto introdutório (antes do 1º bullet) dos bullets em si
+      const lines = p.split(/\n/);
+      const intro: string[] = [];
+      const bullets: string[] = [];
+      let started = false;
+      for (const ln of lines) {
+        if (/^\s*•\s+/.test(ln)) {
+          started = true;
+          bullets.push(ln.trim());
+        } else if (!started) {
+          intro.push(ln);
+        } else {
+          // Linha de continuação do bullet anterior
+          if (bullets.length > 0) {
+            bullets[bullets.length - 1] = `${bullets[bullets.length - 1]} ${ln.trim()}`;
+          } else {
+            intro.push(ln);
+          }
+        }
+      }
+      const introText = intro.join(' ').trim();
+      if (introText) afterBullets.push(introText);
+      for (const b of bullets) afterBullets.push(b);
+    } else {
+      afterBullets.push(p);
+    }
   }
+  parts = afterBullets;
 
-  // Mescla pedaços muito curtos no anterior
+  // 3ª camada: parágrafos longos vão pra split por sentença
+  const sentenceSplit: string[] = [];
+  for (const p of parts) {
+    if (p.length > LONG_PARAGRAPH) {
+      const sents = p
+        .split(/(?<=[.!?])\s+(?=[A-ZÀ-Úa-zÀ-ú])/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (sents.length > 1) {
+        sentenceSplit.push(...sents);
+        continue;
+      }
+    }
+    sentenceSplit.push(p);
+  }
+  parts = sentenceSplit;
+
+  // Mescla pedaços muito curtos com o anterior (evita "💙" sozinho)
   const merged: string[] = [];
   for (const p of parts) {
     const last = merged[merged.length - 1];
-    if (last && (last.length < MIN_CHUNK_LEN || p.length < MIN_CHUNK_LEN)) {
-      merged[merged.length - 1] = `${last}\n\n${p}`;
+    if (last && p.length < MIN_CHUNK_LEN) {
+      merged[merged.length - 1] = `${last}\n${p}`;
     } else {
       merged.push(p);
     }
@@ -69,7 +114,7 @@ export function splitForHuman(rawText: string): string[] {
   // Limita ao máximo, agrupando o "rabo" no último
   if (merged.length > MAX_CHUNKS) {
     const head = merged.slice(0, MAX_CHUNKS - 1);
-    const tail = merged.slice(MAX_CHUNKS - 1).join('\n\n');
+    const tail = merged.slice(MAX_CHUNKS - 1).join('\n');
     return [...head, tail];
   }
 
@@ -77,13 +122,14 @@ export function splitForHuman(rawText: string): string[] {
 }
 
 /**
- * Delay em ms entre mensagens. Aprox. 25 char/s leitura
- * + variação aleatória pra parecer humano.
+ * Delay em ms entre mensagens. Simula pessoa digitando: pausa curta
+ * proporcional ao tamanho da próxima frase. Como agora geramos mais
+ * chunks (até 7), as pausas são mais enxutas pra a conversa fluir.
  */
 export function humanDelayMs(previousText: string): number {
-  const base = 800;
-  const readTime = Math.min(previousText.length * 35, 3500);
-  const jitter = Math.floor(Math.random() * 400);
+  const base = 450;
+  const readTime = Math.min(previousText.length * 22, 1800);
+  const jitter = Math.floor(Math.random() * 350);
   return base + readTime + jitter;
 }
 

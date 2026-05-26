@@ -114,6 +114,8 @@ export const functionHandlers: Record<
         // priceInstallment eh o TOTAL parcelado em ate `installments` vezes.
         priceCashMeaning: 'a vista (dinheiro ou PIX) — preço final, ja com desconto',
         priceInstallmentMeaning: 'total parcelado no cartao em ate `installments` vezes',
+        stockMeaning:
+          'inStock=false significa que a vacina esta em falta. Informe o paciente e ofereca anotar nome em lista de espera (chame request_handoff com reason=waitlist)',
         vaccines: filtered.map((v) => ({
           name: v.name,
           slug: v.slug,
@@ -122,6 +124,8 @@ export const functionHandlers: Record<
           priceInstallment: Number(v.priceInstallment),
           installments: v.installments,
           description: v.description,
+          inStock: v.inStock,
+          outOfStockNote: v.outOfStockNote ?? null,
         })),
       }),
     };
@@ -156,12 +160,16 @@ export const functionHandlers: Record<
         // priceInstallment eh o TOTAL parcelado no cartao em ate `installments` vezes.
         priceCashMeaning: 'a vista (dinheiro ou PIX) — preço final, ja com desconto',
         priceInstallmentMeaning: 'total parcelado no cartao em ate `installments` vezes',
+        stockMeaning:
+          'inStock=false significa que a vacina esta em falta. Informe o paciente e ofereca anotar nome em lista de espera (chame request_handoff com reason=waitlist)',
         recommended: recommended.map((v) => ({
           name: v.name,
           priceCash: Number(v.priceCash),
           priceInstallment: Number(v.priceInstallment),
           installments: v.installments,
           description: v.description,
+          inStock: v.inStock,
+          outOfStockNote: v.outOfStockNote ?? null,
         })),
         packageAvailable: pkg
           ? {

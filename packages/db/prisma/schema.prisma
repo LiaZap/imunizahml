@@ -214,6 +214,11 @@ model Vaccine {
   priceInstallment Decimal  @db.Decimal(10, 2)
   installments     Int      @default(3)
   active           Boolean  @default(true)
+  /// True quando ha estoque. Quando false, IA informa o paciente que esta em falta
+  /// e oferece adicionar à lista de espera (via request_handoff com reason=waitlist).
+  inStock          Boolean  @default(true)
+  /// Nota opcional exibida na resposta quando inStock=false (ex: "previsao maio/26").
+  outOfStockNote   String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

@@ -13,6 +13,8 @@ const vaccineBody = z.object({
   priceInstallment: z.number().nonnegative(),
   installments: z.number().int().positive().default(3),
   active: z.boolean().default(true),
+  inStock: z.boolean().default(true),
+  outOfStockNote: z.string().nullish(),
 });
 
 const vaccineUpdate = vaccineBody.partial();

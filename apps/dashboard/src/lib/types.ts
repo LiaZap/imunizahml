@@ -39,6 +39,8 @@ export interface Vaccine {
   priceInstallment: number;
   installments: number;
   active: boolean;
+  inStock?: boolean;
+  outOfStockNote?: string | null;
 }
 
 export interface VaccinePackage {

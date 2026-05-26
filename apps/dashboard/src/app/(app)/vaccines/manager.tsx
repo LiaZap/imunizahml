@@ -150,6 +150,31 @@ export function VaccinesManager({
     setVaccines((prev) => prev.filter((v) => v.id !== id));
   }
 
+  async function toggleStock(v: Vaccine) {
+    const next = !(v.inStock ?? true);
+    let note: string | null | undefined = v.outOfStockNote;
+    if (!next) {
+      const input = prompt(
+        'Marcar como EM FALTA. A IA passa a oferecer lista de espera ao paciente.\n\n' +
+          'Quer adicionar uma observação? (ex.: "previsão maio/26")\nDeixe em branco se não tiver.',
+        v.outOfStockNote ?? '',
+      );
+      if (input === null) return; // cancelou
+      note = input.trim() || null;
+    } else {
+      note = null;
+    }
+    try {
+      const updated = await api<Vaccine>(`/vaccines/${v.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ inStock: next, outOfStockNote: note }),
+      });
+      setVaccines((prev) => prev.map((x) => (x.id === updated.id ? { ...x, ...updated } : x)));
+    } catch (err) {
+      alert(`Falha: ${(err as Error).message}`);
+    }
+  }
+
   return (
     <>
       {packages.length > 0 && (
@@ -272,11 +297,30 @@ export function VaccinesManager({
                     </div>
                   </div>
 
-                  {!v.active && (
-                    <div className="mt-3 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500">
-                      Inativa
-                    </div>
-                  )}
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    {!v.active && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-500">
+                        Inativa
+                      </span>
+                    )}
+                    {v.inStock === false && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-rose-200">
+                        Em falta
+                        {v.outOfStockNote ? ` · ${v.outOfStockNote}` : ''}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => toggleStock(v)}
+                      className={`ml-auto inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold transition ${
+                        v.inStock === false
+                          ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200 hover:bg-emerald-100'
+                          : 'bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50'
+                      }`}
+                      title={v.inStock === false ? 'Marcar de volta em estoque' : 'Marcar como em falta'}
+                    >
+                      {v.inStock === false ? '✓ Voltar ao estoque' : 'Marcar em falta'}
+                    </button>
+                  </div>
                 </div>
               );
             })}

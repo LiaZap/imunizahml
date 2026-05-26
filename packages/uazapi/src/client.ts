@@ -172,12 +172,25 @@ export class UazapiClient {
       pickString(instanceBag, ['profileName', 'name', 'pushName', 'wa_name']) ??
       pickString(json, ['profileName', 'name']);
 
+    const normalizedPhone = phone?.replace(/@.*/, '').replace(/^\+/, '') || undefined;
+    // Estritamente: "connected" so eh real se houver um numero pareado.
+    // A Uazapi marca state=connected mesmo quando a instancia existe sem WhatsApp pareado.
+    // Tambem ignoramos "phone" suspeito (vazio, "0", "null") como sentinela.
+    const hasValidPhone =
+      !!normalizedPhone && normalizedPhone.length >= 8 && /^\d+$/.test(normalizedPhone);
+
+    if (state === 'connected' && !hasValidPhone) {
+      // Instancia de pe mas sem WhatsApp pareado: mostra como pairing/disconnected
+      // pra UI exibir o botao "Conectar" em vez de "Desconectar".
+      state = qrcode || pairCode ? 'pairing' : 'disconnected';
+    }
+
     return {
       state,
       qrcode,
       pairCode,
-      phone: phone?.replace(/@.*/, ''),
-      profileName,
+      phone: hasValidPhone ? normalizedPhone : undefined,
+      profileName: hasValidPhone ? profileName : undefined,
       raw: json,
     };
   }

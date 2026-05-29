@@ -5,7 +5,7 @@ export interface SessionUser {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'attendant';
+  role: 'admin' | 'attendant' | 'secretary';
   tenantId: string;
 }
 

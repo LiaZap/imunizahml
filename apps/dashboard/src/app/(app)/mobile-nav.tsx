@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { LayoutGrid, X } from 'lucide-react';
-import { navItems, type NavItem } from './nav-items';
+import { filterNavForRole, type NavItem } from './nav-items';
 
 // Tabs fixas na barra inferior (mesmas para todos os perfis)
 const primaryHrefs = ['/queue', '/patients', '/metrics', '/vaccines'] as const;
@@ -17,13 +17,13 @@ export function MobileNav({
 }: {
   userName: string;
   userEmail: string;
-  userRole: 'admin' | 'attendant';
+  userRole: 'admin' | 'attendant' | 'secretary';
   logoutSlot: React.ReactNode;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const pathname = usePathname();
 
-  const visibleNav = navItems.filter((i) => !i.adminOnly || userRole === 'admin');
+  const visibleNav = filterNavForRole(userRole);
   const primary = primaryHrefs
     .map((h) => visibleNav.find((i) => i.href === h))
     .filter(Boolean) as NavItem[];
@@ -171,7 +171,11 @@ export function MobileNav({
               <div className="truncate text-xs text-slate-500">{userEmail}</div>
             </div>
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
-              {userRole === 'admin' ? 'Administrador' : 'Atendente'}
+              {userRole === 'admin'
+                ? 'Administrador'
+                : userRole === 'secretary'
+                  ? 'Secretária'
+                  : 'Atendente'}
             </span>
           </div>
           <div className="mt-3 flex justify-end">{logoutSlot}</div>

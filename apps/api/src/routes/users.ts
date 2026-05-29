@@ -10,13 +10,13 @@ const createBody = z.object({
   email: z.string().email(),
   name: z.string().min(1),
   password: z.string().min(6),
-  role: z.enum(['admin', 'attendant']).default('attendant'),
+  role: z.enum(['admin', 'attendant', 'secretary']).default('attendant'),
 });
 
 const updateBody = z.object({
   name: z.string().optional(),
   password: z.string().min(6).optional(),
-  role: z.enum(['admin', 'attendant']).optional(),
+  role: z.enum(['admin', 'attendant', 'secretary']).optional(),
   active: z.boolean().optional(),
 });
 

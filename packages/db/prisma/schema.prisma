@@ -12,6 +12,7 @@ datasource db {
 enum UserRole {
   admin
   attendant
+  secretary
 }
 
 enum ConversationStatus {

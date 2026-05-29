@@ -48,7 +48,10 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch('/', async (req, reply) => {
     const tenantId = req.session!.tenantId;
-    if (req.session!.role !== 'admin') return reply.code(403).send({ error: 'forbidden' });
+    const role = req.session!.role;
+    if (role !== 'admin' && role !== 'secretary') {
+      return reply.code(403).send({ error: 'forbidden' });
+    }
 
     const body = configBody.parse(req.body);
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });

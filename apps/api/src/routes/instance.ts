@@ -13,7 +13,8 @@ const connectBody = z.object({
 
 export async function instanceRoutes(app: FastifyInstance): Promise<void> {
   app.get('/status', async (req, reply) => {
-    if (req.session!.role !== 'admin') return reply.code(403).send({ error: 'forbidden' });
+    if (req.session!.role !== 'admin' && req.session!.role !== 'secretary')
+      return reply.code(403).send({ error: 'forbidden' });
     try {
       return await uazapi.getInstanceStatus();
     } catch (err) {
@@ -23,7 +24,8 @@ export async function instanceRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post('/connect', async (req, reply) => {
-    if (req.session!.role !== 'admin') return reply.code(403).send({ error: 'forbidden' });
+    if (req.session!.role !== 'admin' && req.session!.role !== 'secretary')
+      return reply.code(403).send({ error: 'forbidden' });
     const body = connectBody.parse(req.body ?? {});
     try {
       return await uazapi.connectInstance(body.phone);
@@ -34,7 +36,8 @@ export async function instanceRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post('/disconnect', async (req, reply) => {
-    if (req.session!.role !== 'admin') return reply.code(403).send({ error: 'forbidden' });
+    if (req.session!.role !== 'admin' && req.session!.role !== 'secretary')
+      return reply.code(403).send({ error: 'forbidden' });
     try {
       await uazapi.disconnectInstance();
       return { ok: true };

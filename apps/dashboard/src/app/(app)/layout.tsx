@@ -4,12 +4,12 @@ import { requireUser } from '@/lib/auth';
 import { LogoutButton } from './logout-button';
 import { NotificationsListener } from './notifications-listener';
 import { MobileNav } from './mobile-nav';
-import { navItems } from './nav-items';
+import { filterNavForRole } from './nav-items';
 import { InstanceStatusBanner } from './instance-status-banner';
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
-  const visibleNav = navItems.filter((i) => !i.adminOnly || user.role === 'admin');
+  const visibleNav = filterNavForRole(user.role);
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-50 lg:flex-row">
@@ -60,7 +60,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           </div>
           <div className="mt-3 flex items-center justify-between text-xs">
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-slate-600">
-              {user.role === 'admin' ? 'Administrador' : 'Atendente'}
+              {user.role === 'admin'
+                ? 'Administrador'
+                : user.role === 'secretary'
+                  ? 'Secretária'
+                  : 'Atendente'}
             </span>
             <LogoutButton />
           </div>

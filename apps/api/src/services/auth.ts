@@ -11,7 +11,7 @@ const MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
 export interface SessionPayload {
   sub: string;
   tenantId: string;
-  role: 'admin' | 'attendant';
+  role: 'admin' | 'attendant' | 'secretary';
   email: string;
 }
 
@@ -30,7 +30,9 @@ export async function verifySession(token: string): Promise<SessionPayload | nul
     if (
       typeof payload.sub === 'string' &&
       typeof payload.tenantId === 'string' &&
-      (payload.role === 'admin' || payload.role === 'attendant') &&
+      (payload.role === 'admin' ||
+        payload.role === 'attendant' ||
+        payload.role === 'secretary') &&
       typeof payload.email === 'string'
     ) {
       return {

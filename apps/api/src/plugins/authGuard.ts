@@ -19,7 +19,7 @@ export async function authGuard(req: FastifyRequest, reply: FastifyReply): Promi
   req.session = session;
 }
 
-export function requireRole(...roles: Array<'admin' | 'attendant'>) {
+export function requireRole(...roles: Array<'admin' | 'attendant' | 'secretary'>) {
   return async (req: FastifyRequest, reply: FastifyReply): Promise<void> => {
     if (!req.session) return reply.code(401).send({ error: 'unauthenticated' });
     if (!roles.includes(req.session.role)) {

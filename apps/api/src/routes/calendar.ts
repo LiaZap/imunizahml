@@ -186,7 +186,8 @@ export async function adminCalendarRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post('/rotate-token', async (req, reply) => {
-    if (req.session!.role !== 'admin') return reply.code(403).send({ error: 'forbidden' });
+    if (req.session!.role !== 'admin' && req.session!.role !== 'secretary')
+      return reply.code(403).send({ error: 'forbidden' });
     const tenantId = req.session!.tenantId;
     const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
     if (!tenant) return reply.code(404).send({ error: 'not_found' });

@@ -98,7 +98,7 @@ export async function vaccinesRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post('/import', async (req, reply) => {
-    if (req.session!.role !== 'admin')
+    if (req.session!.role !== 'admin' && req.session!.role !== 'secretary')
       return reply.code(403).send({ error: 'forbidden' });
     const tenantId = req.session!.tenantId;
     const body = importBody.parse(req.body);

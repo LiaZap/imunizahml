@@ -19,7 +19,7 @@ export function UsersManager({
     email: '',
     name: '',
     password: '',
-    role: 'attendant' as 'admin' | 'attendant',
+    role: 'attendant' as 'admin' | 'attendant' | 'secretary',
     active: true,
   });
   const [saving, setSaving] = useState(false);
@@ -136,6 +136,10 @@ export function UsersManager({
                     <span className="inline-flex items-center gap-1 rounded-full bg-brand-soft px-2 py-0.5 text-[11px] font-semibold text-brand-deep">
                       <ShieldCheck className="h-3 w-3" /> Admin
                     </span>
+                  ) : u.role === 'secretary' ? (
+                    <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent-foreground">
+                      Secretária
+                    </span>
                   ) : (
                     <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] text-slate-600">
                       Atendente
@@ -229,10 +233,16 @@ export function UsersManager({
               <Field label="Papel">
                 <select
                   value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value as 'admin' | 'attendant' })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      role: e.target.value as 'admin' | 'attendant' | 'secretary',
+                    })
+                  }
                   className="input"
                 >
                   <option value="attendant">Atendente</option>
+                  <option value="secretary">Secretária</option>
                   <option value="admin">Administrador</option>
                 </select>
               </Field>

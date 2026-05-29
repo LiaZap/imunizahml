@@ -175,7 +175,7 @@ export interface UserRecord {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'attendant';
+  role: 'admin' | 'attendant' | 'secretary';
   active: boolean;
   createdAt: string;
 }

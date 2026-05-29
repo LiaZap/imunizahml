@@ -35,7 +35,9 @@ const features = [
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get('next') ?? '/metrics';
+  // O destino default eh resolvido por role apos autenticar (via /).
+  // Se o user veio de uma URL especifica (?next=), respeita ela.
+  const next = params.get('next') ?? '/';
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

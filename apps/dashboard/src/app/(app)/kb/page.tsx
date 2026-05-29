@@ -1,9 +1,14 @@
+import { notFound } from 'next/navigation';
 import { BookOpen, Brain } from 'lucide-react';
 import { apiGet } from '@/lib/api-server';
+import { requireUser } from '@/lib/auth';
 import type { KBDocumentSummary } from '@/lib/types';
 import { KBManager } from './manager';
 
 export default async function KBPage() {
+  const user = await requireUser();
+  if (user.role === 'secretary') notFound();
+
   const docs = (await apiGet<KBDocumentSummary[]>('/kb/documents')) ?? [];
   const totalChunks = docs.reduce((sum, d) => sum + (d._count?.chunks ?? 0), 0);
   const activeDocs = docs.filter((d) => d.active).length;

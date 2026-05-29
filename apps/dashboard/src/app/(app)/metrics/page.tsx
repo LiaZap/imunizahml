@@ -10,7 +10,9 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react';
+import { notFound } from 'next/navigation';
 import { apiGet } from '@/lib/api-server';
+import { requireUser } from '@/lib/auth';
 import type {
   FunnelData,
   HourlyPoint,
@@ -81,6 +83,9 @@ function Kpi({
 }
 
 export default async function MetricsPage() {
+  const user = await requireUser();
+  if (user.role === 'secretary') notFound();
+
   const [overview, weekly, hourly, breakdown, funnel] = await Promise.all([
     apiGet<MetricsOverview>('/metrics/overview'),
     apiGet<WeeklyPoint[]>('/metrics/weekly'),

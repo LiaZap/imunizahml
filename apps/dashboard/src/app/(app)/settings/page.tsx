@@ -8,7 +8,7 @@ import { WhatsappConnection } from './whatsapp-connection';
 
 export default async function SettingsPage() {
   const user = await requireUser();
-  if (user.role !== 'admin') notFound();
+  if (user.role !== 'admin' && user.role !== 'secretary') notFound();
   const settings = await apiGet<TenantSettings>('/settings');
   if (!settings) return <div className="p-4 sm:p-6 lg:p-8">Não foi possível carregar as configurações.</div>;
 

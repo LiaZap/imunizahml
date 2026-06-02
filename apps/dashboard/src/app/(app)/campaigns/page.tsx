@@ -7,7 +7,7 @@ import { CampaignsManager } from './manager';
 
 export default async function CampaignsPage() {
   const user = await requireUser();
-  if (user.role !== 'admin') notFound();
+  if (user.role !== 'admin' && user.role !== 'secretary') notFound();
   const campaigns = (await apiGet<Campaign[]>('/campaigns')) ?? [];
 
   return (

@@ -23,7 +23,7 @@ async function main() {
       slug: tenantSlug,
       config: {
         greeting:
-          'Olá! Que alegria ter você por aqui 💙 Sou a assistente virtual da clínica e estou pronta para tirar suas dúvidas sobre vacinação. Pode me contar o que você precisa?',
+          'Olá! Aqui é da clínica. Tudo bem? Me conta como posso te ajudar.',
         persona:
           'Você é uma atendente virtual humanizada e empática de uma clínica de vacinação no Brasil. Seu tom é acolhedor, claro e nunca alarmista.',
         businessHours: { start: '08:00', end: '18:00', timezone: 'America/Sao_Paulo' },

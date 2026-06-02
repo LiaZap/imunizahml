@@ -92,8 +92,9 @@ function statusLabel(s: string): string {
 
 function icalStatus(s: string): string {
   if (s === 'cancelled') return 'CANCELLED';
-  if (s === 'attended' || s === 'paid' || s === 'no_show') return 'CONFIRMED';
-  return 'TENTATIVE';
+  // Tudo que esta agendado/atendido/pago aparece como CONFIRMED.
+  // TENTATIVE confunde o Google Agenda (algumas vezes exibe com opacidade).
+  return 'CONFIRMED';
 }
 
 export async function publicCalendarRoutes(app: FastifyInstance): Promise<void> {

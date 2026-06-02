@@ -47,21 +47,30 @@ function fold(line: string): string {
 }
 
 function buildIcs(events: string[]): string {
-  return (
-    [
-      'BEGIN:VCALENDAR',
-      'VERSION:2.0',
-      'PRODID:-//Imuniza//Agenda//PT-BR',
-      'CALSCALE:GREGORIAN',
-      'METHOD:PUBLISH',
-      'X-WR-CALNAME:Imuniza — Agenda da Clínica',
-      'X-WR-TIMEZONE:America/Sao_Paulo',
-      ...events,
-      'END:VCALENDAR',
-    ]
-      .map(fold)
-      .join('\r\n') + '\r\n'
-  );
+  // IMPORTANTE: events sao blocos com varias linhas separadas por \r\n.
+  // Precisamos quebrar em linhas individuais antes de aplicar fold(),
+  // senao fold conta \r\n como char comum e quebra no meio de palavras-chave
+  // (gerando DTST\n AMP em vez de DTSTAMP, e o Google ignora o evento).
+  const header = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Imuniza//Agenda//PT-BR',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'X-WR-CALNAME:Imuniza — Agenda da Clínica',
+    'X-WR-TIMEZONE:America/Sao_Paulo',
+  ];
+
+  const allLines: string[] = [...header];
+  for (const event of events) {
+    // Cada event vem como string multi-linha — separa em linhas individuais
+    for (const line of event.split(/\r?\n/)) {
+      if (line.length > 0) allLines.push(line);
+    }
+  }
+  allLines.push('END:VCALENDAR');
+
+  return allLines.map(fold).join('\r\n') + '\r\n';
 }
 
 function statusLabel(s: string): string {

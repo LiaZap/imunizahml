@@ -99,6 +99,8 @@ export async function runAgent(input: RunAgentInput): Promise<void> {
     logger: input.logger,
   };
 
+  let alreadySentInThisTurn = false;
+
   for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
     const completion = await ai.client.chat.completions.create({
       model: ai.chatModel,
@@ -141,6 +143,12 @@ export async function runAgent(input: RunAgentInput): Promise<void> {
 
         const result = await handler(parsedArgs, ctx);
 
+        // Se a tool ja enviou para o paciente (ex: send_reply), marca
+        // pra nao duplicar com o fallback no fim do turno.
+        if (result.sideEffects?.sentToPatient) {
+          alreadySentInThisTurn = true;
+        }
+
         await addMessage({
           conversationId: input.conversationId,
           role: 'tool',
@@ -158,7 +166,20 @@ export async function runAgent(input: RunAgentInput): Promise<void> {
     }
 
     const finalText = assistantMsg.content?.trim();
-    if (finalText) {
+    if (finalText && alreadySentInThisTurn) {
+      // Modelo emitiu texto final apos ja ter chamado send_reply. Isso
+      // duplicaria a mensagem. So salva no historico sem enviar.
+      await addMessage({
+        conversationId: input.conversationId,
+        role: 'assistant',
+        content: finalText,
+        metadata: { duplicateOfPriorSendReply: true, notSent: true },
+      });
+      input.logger.info(
+        { finalTextLen: finalText.length },
+        'agent fallback skipped — send_reply ja enviou neste turno',
+      );
+    } else if (finalText) {
       // Fallback humanizado: o modelo respondeu com texto direto, sem
       // chamar send_reply. Mesmo assim mandamos pro paciente quebrando
       // em chunks (sendHumanized salva cada um como Message).

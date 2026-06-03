@@ -340,6 +340,8 @@ model Appointment {
   expectedValue   Decimal?          @db.Decimal(10, 2)
   paidValue       Decimal?          @db.Decimal(10, 2)
   notes           String?
+  /// Campo livre p/ integrações (ex: googleEventId quando sincronizado com Google Calendar).
+  metadata        Json              @default("{}")
   createdByUserId String?           @db.Uuid
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt

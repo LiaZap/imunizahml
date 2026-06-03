@@ -27,6 +27,7 @@
     "bullmq": "^5.35.0",
     "dotenv": "^16.4.7",
     "fastify": "^5.2.1",
+    "googleapis": "^173.0.0",
     "ioredis": "^5.4.2",
     "jose": "^5.9.6",
     "mammoth": "^1.8.0",

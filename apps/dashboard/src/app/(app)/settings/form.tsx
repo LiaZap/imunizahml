@@ -92,6 +92,67 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ kind: 'ok' | 'error'; msg: string } | null>(null);
 
+  // ── Google OAuth ──
+  type GoogleStatus = {
+    configured: boolean;
+    connected: boolean;
+    email: string | null;
+    calendarId: string | null;
+    connectedAt: string | null;
+  };
+  const [googleStatus, setGoogleStatus] = useState<GoogleStatus | null>(null);
+  const [googleBusy, setGoogleBusy] = useState(false);
+
+  async function refreshGoogleStatus() {
+    try {
+      const s = await api<GoogleStatus>('/google/oauth/status');
+      setGoogleStatus(s);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  useEffect(() => {
+    refreshGoogleStatus();
+    // Volta da tela de consent? Mostra mensagem.
+    if (typeof window !== 'undefined') {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get('google') === 'ok') {
+        setStatus({ kind: 'ok', msg: 'Google Calendar conectado!' });
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (sp.get('google') === 'error') {
+        setStatus({
+          kind: 'error',
+          msg: `Falha ao conectar Google: ${sp.get('reason') ?? 'erro'}`,
+        });
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+  }, []);
+
+  async function connectGoogle() {
+    setGoogleBusy(true);
+    try {
+      const { url } = await api<{ url: string }>('/google/oauth/start');
+      window.location.href = url;
+    } catch (err) {
+      alert(`Falha: ${(err as Error).message}`);
+    } finally {
+      setGoogleBusy(false);
+    }
+  }
+
+  async function disconnectGoogle() {
+    if (!confirm('Desconectar o Google Calendar? Novos agendamentos não serão mais sincronizados.')) return;
+    setGoogleBusy(true);
+    try {
+      await api('/google/oauth/disconnect', { method: 'POST', body: '{}' });
+      await refreshGoogleStatus();
+    } finally {
+      setGoogleBusy(false);
+    }
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -247,7 +308,63 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
       <Section
         icon={CalendarDays}
         title="Integração com Google Agenda"
-        description="Cole o link abaixo no Google Agenda da secretária. Todos os agendamentos da plataforma aparecem automaticamente na agenda dela."
+        description="Conecte a conta Google da clínica. Os agendamentos da plataforma sincronizam em tempo real."
+      >
+        <div className="rounded-xl border border-slate-200 bg-white p-4">
+          {!googleStatus?.configured && (
+            <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+              ⚠️ OAuth do Google ainda não configurado. Defina as env vars{' '}
+              <code className="rounded bg-white px-1">GOOGLE_CLIENT_ID</code>,{' '}
+              <code className="rounded bg-white px-1">GOOGLE_CLIENT_SECRET</code> e{' '}
+              <code className="rounded bg-white px-1">GOOGLE_OAUTH_REDIRECT_URI</code> no Easypanel.
+            </div>
+          )}
+          {googleStatus?.configured && !googleStatus.connected && (
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex-1 text-sm text-slate-600">
+                Nenhuma conta Google conectada ainda.
+              </div>
+              <button
+                type="button"
+                onClick={connectGoogle}
+                disabled={googleBusy}
+                className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white shadow-card hover:bg-brand-deep disabled:opacity-50"
+              >
+                {googleBusy ? 'Aguarde…' : '🔗 Conectar com Google'}
+              </button>
+            </div>
+          )}
+          {googleStatus?.connected && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200">
+                  ● Conectado
+                </span>
+                <span className="text-slate-700">{googleStatus.email}</span>
+              </div>
+              <div className="text-xs text-slate-500">
+                Agenda usada: <b>{googleStatus.calendarId === 'primary' ? 'Agenda principal' : googleStatus.calendarId}</b>
+                {googleStatus.connectedAt && (
+                  <> · conectado em {new Date(googleStatus.connectedAt).toLocaleDateString('pt-BR')}</>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={disconnectGoogle}
+                disabled={googleBusy}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50"
+              >
+                Desconectar
+              </button>
+            </div>
+          )}
+        </div>
+      </Section>
+
+      <Section
+        icon={CalendarDays}
+        title="Link iCal (alternativa, somente leitura)"
+        description="Caso prefira não usar OAuth. Cole o link no Google Agenda → Outras agendas → Inscrever-se via URL."
       >
         {icalUrl ? (
           <>

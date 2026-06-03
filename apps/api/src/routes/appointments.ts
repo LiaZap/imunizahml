@@ -1,10 +1,15 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma, AppointmentStatus } from '@imuniza/db';
+import { prisma, AppointmentStatus, Prisma } from '@imuniza/db';
 import {
   scheduleAppointmentReminders,
   cancelAppointmentReminders,
 } from '../services/appointmentReminders.js';
+import {
+  upsertEvent as upsertGoogleEvent,
+  deleteEvent as deleteGoogleEvent,
+  loadGoogleConfig,
+} from '../services/googleCalendar.js';
 
 const paramsSchema = z.object({ id: z.string().uuid() });
 
@@ -82,6 +87,9 @@ export async function appointmentsRoutes(app: FastifyInstance): Promise<void> {
       req.log.error({ err, appointmentId: created.id }, 'failed to schedule reminders');
     }
 
+    // Push para Google Calendar (se conectado)
+    void pushToGoogle(tenantId, created.id, req);
+
     return reply.code(201).send(serialize(created));
   });
 
@@ -114,6 +122,9 @@ export async function appointmentsRoutes(app: FastifyInstance): Promise<void> {
       }
     }
 
+    // Push para Google (update se ja tinha eventId, insert senao)
+    void pushToGoogle(tenantId, updated.id, req);
+
     return serialize(updated);
   });
 
@@ -123,7 +134,52 @@ export async function appointmentsRoutes(app: FastifyInstance): Promise<void> {
     const existing = await prisma.appointment.findFirst({ where: { id, tenantId } });
     if (!existing) return reply.code(404).send({ error: 'not_found' });
     await cancelAppointmentReminders(id).catch(() => undefined);
+
+    // Remove do Google se tinha evento
+    const meta = (existing.metadata as { googleEventId?: string } | null) ?? {};
+    if (meta.googleEventId) {
+      try {
+        await deleteGoogleEvent({ tenantId, eventId: meta.googleEventId });
+      } catch (err) {
+        req.log.error({ err, appointmentId: id }, 'failed to delete google event');
+      }
+    }
+
     await prisma.appointment.delete({ where: { id } });
     return reply.code(204).send();
   });
+}
+
+async function pushToGoogle(
+  tenantId: string,
+  appointmentId: string,
+  req: { log: { error: (obj: unknown, msg?: string) => void; info: (obj: unknown, msg?: string) => void } },
+): Promise<void> {
+  try {
+    const cfg = await loadGoogleConfig(tenantId);
+    if (!cfg) return; // não conectado
+
+    const appt = await prisma.appointment.findFirst({
+      where: { id: appointmentId, tenantId },
+      include: { patient: { select: { name: true, phone: true } } },
+    });
+    if (!appt) return;
+
+    const meta = (appt.metadata as { googleEventId?: string } | null) ?? {};
+    const eventId = await upsertGoogleEvent({
+      tenantId,
+      appointment: appt,
+      existingEventId: meta.googleEventId,
+    });
+
+    if (eventId && eventId !== meta.googleEventId) {
+      await prisma.appointment.update({
+        where: { id: appointmentId },
+        data: { metadata: { ...meta, googleEventId: eventId } as Prisma.InputJsonValue },
+      });
+    }
+    req.log.info({ appointmentId, eventId }, 'google calendar event upserted');
+  } catch (err) {
+    req.log.error({ err, appointmentId }, 'failed to push to google calendar');
+  }
 }

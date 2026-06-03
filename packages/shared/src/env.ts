@@ -33,6 +33,11 @@ const envSchema = z.object({
   AUTH_SECRET: z.string().min(16),
   AUTH_URL: z.string().url(),
 
+  /** OAuth do Google Calendar (opcional — se nao setado, integracao fica desligada) */
+  GOOGLE_CLIENT_ID: z.string().default(''),
+  GOOGLE_CLIENT_SECRET: z.string().default(''),
+  GOOGLE_OAUTH_REDIRECT_URI: z.string().default(''),
+
   DEFAULT_TENANT_NAME: z.string().default('Clinica Imuniza'),
   DEFAULT_ADMIN_EMAIL: z.string().email().default('admin@imuniza.local'),
   DEFAULT_ADMIN_PASSWORD: z.string().default('change-me'),

@@ -100,7 +100,27 @@ export function splitForHuman(rawText: string): string[] {
   }
   parts = sentenceSplit;
 
-  // Mescla pedaços muito curtos com o anterior (evita "💙" sozinho)
+  // Dedup de saudacao: se o chunk 2+ comecar com "Ola/Oi/Tudo bem/Bom dia"
+  // E o chunk anterior tambem comecou com saudacao, remove a saudacao do
+  // segundo (mantem so o conteudo). Evita "Ola!" + "Oi! Como posso..." picados.
+  const SALUTATION_RE =
+    /^\s*(ol[aá]|oi|tudo bem|bom dia|boa tarde|boa noite|ei!?)[\s,!.?]*/i;
+  const isSalutation = (s: string) => SALUTATION_RE.test(s);
+  const stripSalutation = (s: string) => s.replace(SALUTATION_RE, '').trim();
+
+  const dedupedSalutations: string[] = [];
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i]!;
+    if (i > 0 && isSalutation(p) && dedupedSalutations.some(isSalutation)) {
+      const stripped = stripSalutation(p);
+      if (stripped) dedupedSalutations.push(stripped);
+    } else {
+      dedupedSalutations.push(p);
+    }
+  }
+  parts = dedupedSalutations;
+
+  // Mescla pedaços muito curtos com o anterior (evita emoji sozinho)
   const merged: string[] = [];
   for (const p of parts) {
     const last = merged[merged.length - 1];

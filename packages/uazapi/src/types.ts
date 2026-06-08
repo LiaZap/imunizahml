@@ -7,7 +7,17 @@ export interface UazapiConfig {
 export interface SendTextInput {
   number: string;
   text: string;
+  /**
+   * Atraso em ms ANTES do envio. Durante esse tempo aparece "Digitando..."
+   * na conversa do paciente. É o jeito oficial da Uazapi de mostrar typing.
+   */
   delayMs?: number;
+  /** Marca o chat como lido após envio (remove contador de não lidas). */
+  readChat?: boolean;
+  /** Marca as últimas 10 mensagens recebidas como lidas (check duplo azul). */
+  readMessages?: boolean;
+  /** ID da mensagem para responder (reply / quote). */
+  replyId?: string;
 }
 
 export interface SendTextResponse {

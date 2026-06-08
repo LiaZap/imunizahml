@@ -193,27 +193,24 @@ export async function sendHumanized(input: HumanizedSendInput): Promise<Humanize
     const chunk = chunks[i]!;
 
     if (i > 0) {
-      // Delay de "leitura" da mensagem anterior
+      // Pausa entre chunks (depois da chegada da mensagem anterior — leitura)
       const delay = humanDelayMs(chunks[i - 1]!);
       await new Promise((r) => setTimeout(r, delay));
     }
 
-    // 1) Mostra "digitando..." na conversa
-    await uazapi
-      .sendPresence({ number: input.patientPhone, presence: 'composing' })
-      .catch(() => undefined); // ignora se Uazapi não suporta
-
-    // 2) Tempo "digitando" proporcional ao tamanho do texto
+    // Tempo de digitação (a Uazapi mostra "Digitando..." durante esse tempo
+    // se passarmos via param `delay` no sendText).
     const typing = typingDurationMs(chunk);
-    await new Promise((r) => setTimeout(r, typing));
-
-    // 3) Para o "digitando" antes de mandar
-    await uazapi
-      .sendPresence({ number: input.patientPhone, presence: 'paused' })
-      .catch(() => undefined);
 
     try {
-      const sent = await uazapi.sendText({ number: input.patientPhone, text: chunk });
+      const sent = await uazapi.sendText({
+        number: input.patientPhone,
+        text: chunk,
+        delayMs: typing,
+        // Só no primeiro chunk: marca as mensagens do paciente como lidas (check duplo azul)
+        readMessages: i === 0,
+        readChat: i === 0,
+      });
       ids.push(sent.id);
       await addMessage({
         conversationId: input.conversationId,

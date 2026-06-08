@@ -143,12 +143,8 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
       media: inbound.media,
     });
 
-    // Marca como "visualizada" (check duplo azul) — não bloqueia a resposta
-    if (inbound.id) {
-      void uazapi
-        .markAsRead({ number: inbound.from, messageId: inbound.id })
-        .catch(() => undefined);
-    }
+    // A marcação como "visualizado" agora é feita junto com o sendText
+    // da resposta da IA (via readMessages: true no humanizedSend).
 
     return reply.code(202).send({ status: 'queued' });
   });

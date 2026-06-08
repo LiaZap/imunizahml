@@ -21,14 +21,19 @@ export class UazapiClient {
   }
 
   async sendText(input: SendTextInput): Promise<SendTextResponse> {
+    const body: Record<string, unknown> = {
+      number: input.number,
+      text: input.text,
+      delay: input.delayMs ?? 0,
+    };
+    if (input.readChat) body.readchat = true;
+    if (input.readMessages) body.readmessages = true;
+    if (input.replyId) body.replyid = input.replyId;
+
     const res = await fetch(`${this.baseUrl}/send/text`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', token: this.token },
-      body: JSON.stringify({
-        number: input.number,
-        text: input.text,
-        delay: input.delayMs ?? 0,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {

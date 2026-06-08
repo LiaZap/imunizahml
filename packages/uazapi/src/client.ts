@@ -284,6 +284,9 @@ export class UazapiClient {
     messageId: string;
     url?: string;
   }): Promise<DownloadedMedia> {
+    const attempts: string[] = [];
+
+    // 1) URL direta (caso já venha completa e pública)
     if (params.url) {
       try {
         const res = await fetch(params.url);
@@ -294,39 +297,100 @@ export class UazapiClient {
             buffer,
           };
         }
-      } catch {
-        /* fall through */
+        attempts.push(`direct-url -> ${res.status}`);
+      } catch (err) {
+        attempts.push(`direct-url -> err:${(err as Error).message}`);
       }
     }
 
-    // Fallback para endpoint Uazapi (varia por versão). Tentamos dois formatos comuns.
+    // 2) Vários endpoints conhecidos da Uazapi (varia por versão)
     const endpoints = [
+      // Mais comuns na Uazapi atual
+      `${this.baseUrl}/message/download`,
       `${this.baseUrl}/message/downloadMedia`,
       `${this.baseUrl}/messages/download`,
+      `${this.baseUrl}/messages/downloadMedia`,
+      `${this.baseUrl}/api/v1/message/download`,
+      `${this.baseUrl}/api/message/download`,
+      `${this.baseUrl}/getMedia`,
+    ];
+
+    // Vários formatos de body que a Uazapi pode aceitar
+    const bodies: Array<Record<string, unknown>> = [
+      { id: params.messageId, messageid: params.messageId },
+      { messageid: params.messageId },
+      { messageId: params.messageId },
+      { id: params.messageId },
     ];
 
     for (const endpoint of endpoints) {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', token: this.token },
-        body: JSON.stringify({ id: params.messageId, messageid: params.messageId }),
-      });
-      if (!res.ok) continue;
-      const body = (await res.json()) as {
-        file?: string;
-        base64?: string;
-        mimetype?: string;
-      };
-      const b64 = body.file ?? body.base64;
-      if (b64) {
-        return {
-          mimetype: body.mimetype ?? 'application/octet-stream',
-          buffer: Buffer.from(b64, 'base64'),
-        };
+      for (const body of bodies) {
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', token: this.token },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) {
+            attempts.push(`${endpoint} (${Object.keys(body).join(',')}) -> ${res.status}`);
+            continue;
+          }
+          // Tenta como JSON primeiro
+          const ct = res.headers.get('content-type') ?? '';
+          if (ct.includes('application/json')) {
+            const json = (await res.json()) as {
+              file?: string;
+              base64?: string;
+              data?: string;
+              mediaBase64?: string;
+              fileBase64?: string;
+              mimetype?: string;
+              mimeType?: string;
+              url?: string;
+              downloadUrl?: string;
+            };
+            const b64 = json.file ?? json.base64 ?? json.data ?? json.mediaBase64 ?? json.fileBase64;
+            if (b64) {
+              return {
+                mimetype: json.mimetype ?? json.mimeType ?? 'application/octet-stream',
+                buffer: Buffer.from(b64, 'base64'),
+              };
+            }
+            // Resposta pode vir com URL pra download (segunda etapa)
+            const downloadUrl = json.url ?? json.downloadUrl;
+            if (downloadUrl) {
+              const sub = await fetch(downloadUrl);
+              if (sub.ok) {
+                const buffer = Buffer.from(await sub.arrayBuffer());
+                return {
+                  mimetype: sub.headers.get('content-type') ?? 'application/octet-stream',
+                  buffer,
+                };
+              }
+              attempts.push(`${endpoint} -> ${downloadUrl} -> ${sub.status}`);
+            } else {
+              attempts.push(`${endpoint} ok mas sem b64/url no JSON`);
+            }
+          } else {
+            // Resposta direta (binário)
+            const buffer = Buffer.from(await res.arrayBuffer());
+            if (buffer.byteLength > 0) {
+              return {
+                mimetype: ct || 'application/octet-stream',
+                buffer,
+              };
+            }
+            attempts.push(`${endpoint} -> binário vazio`);
+          }
+        } catch (err) {
+          attempts.push(`${endpoint} -> err:${(err as Error).message}`);
+        }
       }
     }
 
-    throw new Error(`Uazapi media download failed for message ${params.messageId}`);
+    throw new Error(
+      `Uazapi media download failed for ${params.messageId}. Tentativas: ${attempts.slice(0, 6).join(' | ')}`,
+    );
   }
 
   /**

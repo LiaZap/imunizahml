@@ -193,6 +193,30 @@ function typingDurationMs(text: string): number {
   return Math.max(minMs, Math.min(maxMs, base + jitter));
 }
 
+/**
+ * Tempo de espera ANTES de marcar como lido — simula a pessoa real que
+ * recebeu a mensagem mas demorou pra abrir o WhatsApp. 5–10s aleatório.
+ *
+ * Sem isso o ✓✓ azul aparece instantaneo (do tempo do ChatGPT pensar),
+ * que parece robotico. Esses segundos extras dao a impressao de "ela
+ * tava ocupada, viu a notificacao agora".
+ */
+function preReadDelayMs(): number {
+  const minMs = 5_000;
+  const maxMs = 10_000;
+  return minMs + Math.floor(Math.random() * (maxMs - minMs));
+}
+
+/**
+ * Pequena pausa depois de ler, antes de comecar a digitar.
+ * Simula "leu a mensagem e ja vai responder". 2–4s.
+ */
+function postReadDelayMs(): number {
+  const minMs = 2_000;
+  const maxMs = 4_000;
+  return minMs + Math.floor(Math.random() * (maxMs - minMs));
+}
+
 export async function sendHumanized(input: HumanizedSendInput): Promise<HumanizedSendResult> {
   const chunks = splitForHuman(input.text);
   const ids: string[] = [];
@@ -209,17 +233,21 @@ export async function sendHumanized(input: HumanizedSendInput): Promise<Humanize
 
     const typing = typingDurationMs(chunk);
 
-    // Fluxo humanizado: NÃO passamos delayMs no sendText (isso "prende" a
-    // mensagem na Uazapi). Em vez disso:
-    //   1) marca como lido (✓✓ azul) — só no primeiro chunk
-    //   2) dispara presence "composing" → "Digitando..." aparece no app
-    //   3) await JS pelo tempo do typing (durante esse tempo o cliente vê
-    //      o "Digitando..." sem que a mensagem ja tenha chegado)
-    //   4) sendText sem delay → mensagem entregue imediato
+    // Fluxo humanizado completo (só no PRIMEIRO chunk — chunks seguintes
+    // pulam o pré-read porque já está visualizado):
+    //   1) await PRÉ-READ (5-10s)         → pessoa demora pra abrir o app
+    //   2) markAsRead                     → ✓✓ azul aparece
+    //   3) await POST-READ (2-4s)         → "lendo a mensagem"
+    //   4) sendPresence "composing"       → "Digitando..." aparece
+    //   5) await typing time (10-15s)     → fica digitando de verdade
+    //   6) sendPresence "paused"          → some o "Digitando..."
+    //   7) sendText (delayMs: 0)          → mensagem chega imediato
     if (i === 0) {
+      await sleep(preReadDelayMs());
       await uazapi
         .markAsRead({ number: input.patientPhone, messageId: '' })
         .catch(() => undefined);
+      await sleep(postReadDelayMs());
     }
 
     await uazapi

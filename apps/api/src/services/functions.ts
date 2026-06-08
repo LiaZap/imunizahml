@@ -68,11 +68,19 @@ export const functionHandlers: Record<
     const current = (existing?.profile as Record<string, unknown>) ?? {};
     const next = { ...current, ...parsed.data };
 
+    // patient.name (coluna principal) recebe o nome do PACIENTE confirmado
+    // pelo agente, NAO o babyName e NAO o pushName do WhatsApp. Esse e o
+    // valor que o gate do request_handoff verifica.
+    const incomingName =
+      typeof parsed.data.name === 'string' && parsed.data.name.trim().length > 0
+        ? parsed.data.name.trim()
+        : null;
+
     await prisma.patient.update({
       where: { id: ctx.patientId },
       data: {
         profile: next,
-        name: parsed.data.babyName ?? existing?.name ?? null,
+        name: incomingName ?? existing?.name ?? null,
       },
     });
 

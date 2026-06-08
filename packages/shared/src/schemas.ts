@@ -6,6 +6,8 @@ export const PhoneSchema = z
 
 export const PatientProfileSchema = z
   .object({
+    /** Nome como o paciente quer ser chamado (informado por ele, NAO o pushName do WhatsApp). */
+    name: z.string().optional(),
     babyAgeMonths: z.number().int().min(0).max(240).optional(),
     babyName: z.string().optional(),
     medicalConditions: z.array(z.string()).optional(),

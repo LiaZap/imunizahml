@@ -11,12 +11,35 @@ import { eventBus } from '../events/bus.js';
 export async function upsertPatient(params: {
   tenantId: string;
   phone: string;
+  /** Nome vindo do pushName do WhatsApp. NÃO eh "nome confirmado" — vai pra
+   *  profile.pushName, NUNCA pra patient.name. O patient.name so eh setado
+   *  quando o paciente confirma como quer ser chamado (via
+   *  update_patient_profile chamado pelo agente). */
   name?: string;
 }): Promise<Patient> {
-  return prisma.patient.upsert({
+  const existing = await prisma.patient.findUnique({
     where: { tenantId_phone: { tenantId: params.tenantId, phone: params.phone } },
-    create: { tenantId: params.tenantId, phone: params.phone, name: params.name ?? null },
-    update: params.name ? { name: params.name } : {},
+  });
+  if (existing) {
+    // So atualiza pushName no profile (nao toca em patient.name)
+    if (params.name) {
+      const current = (existing.profile as Record<string, unknown>) ?? {};
+      const next = { ...current, pushName: params.name };
+      return prisma.patient.update({
+        where: { id: existing.id },
+        data: { profile: next },
+      });
+    }
+    return existing;
+  }
+  return prisma.patient.create({
+    data: {
+      tenantId: params.tenantId,
+      phone: params.phone,
+      // NAO seta patient.name a partir do pushName
+      name: null,
+      profile: params.name ? { pushName: params.name } : {},
+    },
   });
 }
 

@@ -22,12 +22,17 @@ export const functionDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] =
     function: {
       name: 'update_patient_profile',
       description:
-        'Atualiza dados do perfil do paciente (idade do bebê, nome, condições). Campos omitidos permanecem inalterados.',
+        'Atualiza dados do perfil do paciente (nome do paciente, idade do bebê, nome do bebê, condições). Campos omitidos permanecem inalterados.',
       parameters: {
         type: 'object',
         properties: {
+          name: {
+            type: 'string',
+            description:
+              'Nome do PACIENTE (como ele/ela quer ser chamado). Use o primeiro nome ou apelido informado. NUNCA use o pushName que aparece no WhatsApp (pode ser nome completo, nome de empresa, etc) — só registre o que o paciente disser explicitamente. Se o paciente recusar dar o nome, use "Não informado".',
+          },
           babyAgeMonths: { type: 'number', description: 'Idade do bebê em meses' },
-          babyName: { type: 'string' },
+          babyName: { type: 'string', description: 'Nome do bebê/criança quando a vacina não é pro paciente' },
           medicalConditions: { type: 'array', items: { type: 'string' } },
           vaccineHistory: { type: 'array', items: { type: 'string' } },
           notes: { type: 'string' },

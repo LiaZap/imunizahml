@@ -78,6 +78,81 @@ export class UazapiClient {
   }
 
   /**
+   * Envia presença (digitando / gravando / disponível) para o paciente.
+   * Aparece como "digitando..." ou "gravando..." na conversa do WhatsApp.
+   *
+   * Estados aceitos pela Uazapi:
+   *   - composing  → "digitando..."
+   *   - recording  → "gravando áudio..."
+   *   - paused     → para de mostrar
+   *   - available  → online
+   *   - unavailable → offline
+   */
+  async sendPresence(input: {
+    number: string;
+    presence: 'composing' | 'recording' | 'paused' | 'available' | 'unavailable';
+    /** Quantos ms manter o presence ativo antes de auto-parar (algumas versões aceitam). */
+    delay?: number;
+  }): Promise<void> {
+    // Endpoints comuns da Uazapi para presence
+    const endpoints = [
+      `${this.baseUrl}/message/presence`,
+      `${this.baseUrl}/sender/presence`,
+      `${this.baseUrl}/instance/presence`,
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', token: this.token },
+          body: JSON.stringify({
+            number: input.number,
+            presence: input.presence,
+            delay: input.delay ?? 0,
+          }),
+        });
+        if (res.ok) return; // sucesso, sai
+      } catch {
+        /* tenta próximo endpoint */
+      }
+    }
+    // Se falhar em todos, não é fatal — só não aparece o "digitando"
+  }
+
+  /**
+   * Marca uma mensagem como lida (check duplo azul) na conversa do paciente.
+   * Aparece como "visualizado" no celular dele.
+   */
+  async markAsRead(input: {
+    number: string;
+    messageId: string;
+  }): Promise<void> {
+    const endpoints = [
+      `${this.baseUrl}/message/markRead`,
+      `${this.baseUrl}/message/read`,
+      `${this.baseUrl}/messages/markRead`,
+      `${this.baseUrl}/chat/markRead`,
+    ];
+    for (const endpoint of endpoints) {
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', token: this.token },
+          body: JSON.stringify({
+            number: input.number,
+            messageid: input.messageId,
+            id: input.messageId,
+          }),
+        });
+        if (res.ok) return;
+      } catch {
+        /* tenta próximo endpoint */
+      }
+    }
+  }
+
+  /**
    * Inicia a conexão da instância. Se já estiver desconectada, a Uazapi gera QR
    * e/ou código de pareamento; com `phone`, força o uso de pairing code numérico.
    */

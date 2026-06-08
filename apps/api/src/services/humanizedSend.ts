@@ -170,6 +170,14 @@ interface HumanizedSendResult {
  * Envia mensagem humanizada (chunks com delay) E salva cada chunk
  * como Message individual no banco com seu uazapiMessageId.
  */
+/**
+ * Tempo de "digitação" antes de enviar um chunk. Maior pra textos longos.
+ * ~30 caracteres por segundo, mínimo 700ms, máximo 3000ms.
+ */
+function typingDurationMs(text: string): number {
+  return Math.min(3000, Math.max(700, Math.floor(text.length * 33)));
+}
+
 export async function sendHumanized(input: HumanizedSendInput): Promise<HumanizedSendResult> {
   const chunks = splitForHuman(input.text);
   const ids: string[] = [];
@@ -178,9 +186,24 @@ export async function sendHumanized(input: HumanizedSendInput): Promise<Humanize
     const chunk = chunks[i]!;
 
     if (i > 0) {
+      // Delay de "leitura" da mensagem anterior
       const delay = humanDelayMs(chunks[i - 1]!);
       await new Promise((r) => setTimeout(r, delay));
     }
+
+    // 1) Mostra "digitando..." na conversa
+    await uazapi
+      .sendPresence({ number: input.patientPhone, presence: 'composing' })
+      .catch(() => undefined); // ignora se Uazapi não suporta
+
+    // 2) Tempo "digitando" proporcional ao tamanho do texto
+    const typing = typingDurationMs(chunk);
+    await new Promise((r) => setTimeout(r, typing));
+
+    // 3) Para o "digitando" antes de mandar
+    await uazapi
+      .sendPresence({ number: input.patientPhone, presence: 'paused' })
+      .catch(() => undefined);
 
     try {
       const sent = await uazapi.sendText({ number: input.patientPhone, text: chunk });

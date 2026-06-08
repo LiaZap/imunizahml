@@ -140,13 +140,31 @@ export function splitForHuman(rawText: string): string[] {
   }
 
   // Limita ao máximo, agrupando o "rabo" no último
+  let final = merged;
   if (merged.length > MAX_CHUNKS) {
     const head = merged.slice(0, MAX_CHUNKS - 1);
     const tail = merged.slice(MAX_CHUNKS - 1).join('\n');
-    return [...head, tail];
+    final = [...head, tail];
   }
 
-  return merged.length > 0 ? merged : [trimmed];
+  // Pontuacao informal estilo WhatsApp:
+  // Remove o PONTO FINAL de chunks NAO-finais (mantem ? e !).
+  // Pra chunks intermediarios, tambem remove ponto final de cada
+  // LINHA dentro dele (bullets/lista), porque cada item sem ponto
+  // fica mais leve. Pergunta no ultimo chunk mantém o ?.
+  return final.map((chunk, idx) => {
+    const isLast = idx === final.length - 1;
+    return chunk
+      .split('\n')
+      .map((line, lineIdx, arr) => {
+        const isLastLine = lineIdx === arr.length - 1;
+        // Remove apenas '.' final (nao toca em ? ! ...).
+        // Excecao: a ULTIMA linha do ULTIMO chunk pode manter '.'
+        if (isLast && isLastLine) return line;
+        return line.replace(/\.+\s*$/g, '');
+      })
+      .join('\n');
+  });
 }
 
 /**

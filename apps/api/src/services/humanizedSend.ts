@@ -35,6 +35,26 @@ function sanitizeForWhatsApp(text: string): string {
     .replace(/^(\s*)[-·▪◦◆]\s+/gm, '$1• ');
 }
 
+/**
+ * Tenta separar "acolhimento curto + pergunta de triagem" em 2 chunks.
+ * Ex: "Aplicamos sim! Pra quem é?" → ["Aplicamos sim!", "Pra quem é?"].
+ * Retorna null se o padrão não bater.
+ */
+function splitGreetingPlusQuestion(text: string): string[] | null {
+  const SHORT_GREETING_MAX = 120;
+  const sents = text
+    .split(/(?<=[.!?])\s+(?=[A-ZÀ-Úa-zÀ-ú])/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (sents.length < 2) return null;
+  const first = sents[0]!;
+  const rest = sents.slice(1).join(' ');
+  if (first.length <= SHORT_GREETING_MAX && !first.includes('?') && rest.includes('?')) {
+    return [first, rest];
+  }
+  return null;
+}
+
 /** Quebra texto em pedaços naturais (já sanitizado para WhatsApp). */
 export function splitForHuman(rawText: string): string[] {
   const trimmed = sanitizeForWhatsApp(rawText).trim();
@@ -42,8 +62,10 @@ export function splitForHuman(rawText: string): string[] {
 
   const hasBullets = /(^|\n)\s*•\s+/.test(trimmed);
 
-  // Texto bem curto, sem quebras nem bullets → 1 mensagem só
+  // Texto bem curto, sem quebras nem bullets → tenta smart-split antes do early-return
   if (trimmed.length < SINGLE_CHUNK_THRESHOLD && !trimmed.includes('\n\n') && !hasBullets) {
+    const smart = splitGreetingPlusQuestion(trimmed);
+    if (smart) return smart;
     return [trimmed];
   }
 
@@ -91,9 +113,16 @@ export function splitForHuman(rawText: string): string[] {
   }
   parts = afterBullets;
 
-  // 3ª camada: parágrafos longos vão pra split por sentença
+  // 3ª camada: smart-split por parágrafo.
+  // - Sempre tenta acolhimento + pergunta (independe do tamanho)
+  // - Se parágrafo for longo (>180 chars), separa por sentença
   const sentenceSplit: string[] = [];
   for (const p of parts) {
+    const smart = splitGreetingPlusQuestion(p);
+    if (smart) {
+      sentenceSplit.push(...smart);
+      continue;
+    }
     if (p.length > LONG_PARAGRAPH) {
       const sents = p
         .split(/(?<=[.!?])\s+(?=[A-ZÀ-Úa-zÀ-ú])/)

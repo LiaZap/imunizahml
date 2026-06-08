@@ -28,8 +28,11 @@ function sanitizeForWhatsApp(text: string): string {
     .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '$1 ($2)')
     // Cabeçalhos Markdown (# ## ###) viram negrito do WhatsApp
     .replace(/^(#{1,6})\s+(.+)$/gm, '*$2*')
-    // Bullets com '- ' viram '• ' (mais limpo no WhatsApp)
-    .replace(/^(\s*)-\s+/gm, '$1• ');
+    // Bullets diversos viram '• ' (padroniza para o splitter detectar)
+    //  - '- item'    (markdown dash)
+    //  - '· item'    (middot — gpt-4.1 costuma usar este)
+    //  - '▪ item' / '◦ item' / '◆ item' (variantes)
+    .replace(/^(\s*)[-·▪◦◆]\s+/gm, '$1• ');
 }
 
 /** Quebra texto em pedaços naturais (já sanitizado para WhatsApp). */

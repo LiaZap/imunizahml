@@ -27,7 +27,15 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
 
     const parsed = UazapiWebhookMessageSchema.safeParse(req.body);
     if (!parsed.success) {
-      req.log.warn({ issues: parsed.error.issues }, 'webhook payload did not match schema');
+      const rawBody = req.body as { message?: { type?: string; messageType?: string } };
+      req.log.warn(
+        {
+          issues: parsed.error.issues,
+          messageType: rawBody?.message?.messageType,
+          type: rawBody?.message?.type,
+        },
+        'webhook payload did not match schema — adicionar campos ao Zod',
+      );
       return reply.code(202).send({ status: 'ignored', reason: 'schema' });
     }
 

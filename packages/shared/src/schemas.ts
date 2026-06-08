@@ -66,7 +66,8 @@ export const UazapiWebhookMessageSchema = z
         type: z.string().optional(), // text | image | audio | video | document | ...
         messageType: z.string().optional(), // Conversation | ExtendedTextMessage | AudioMessage | ImageMessage | ...
         mediaType: z.string().optional(),
-        content: z.string().optional(),
+        // content pode ser string (texto) ou objeto (mídia com url/mimeType)
+        content: z.union([z.string(), z.record(z.any())]).optional(),
         text: z.string().optional(),
         caption: z.string().optional(),
         fileName: z.string().optional(),

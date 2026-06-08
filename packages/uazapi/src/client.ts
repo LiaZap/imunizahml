@@ -377,7 +377,7 @@ export class UazapiClient {
         type?: string;
         messageType?: string;
         mediaType?: string;
-        content?: string;
+        content?: string | Record<string, unknown>;
         text?: string;
         caption?: string;
         fileName?: string;
@@ -448,14 +448,37 @@ export class UazapiClient {
       rawMessageType === 'documentmessage' ||
       mediaTypeLower === 'document';
 
-    let text = msg.text ?? (isText ? msg.content : '') ?? '';
+    // content pode vir como string (texto) ou objeto (mídia com {url, mimeType, ...})
+    const contentObj =
+      msg.content && typeof msg.content === 'object' && !Array.isArray(msg.content)
+        ? (msg.content as Record<string, unknown>)
+        : null;
+    const contentStr = typeof msg.content === 'string' ? msg.content : '';
+
+    let text = msg.text ?? (isText ? contentStr : '') ?? '';
     let media: InboundMessage['media'];
 
-    const mediaUrl = msg.fileURL ?? msg.mediaURL ?? msg.url;
-    const mime = msg.mimeType ?? msg.mimetype;
+    // URL da mídia: procura nos campos diretos OU dentro do content (quando é objeto)
+    const mediaUrl =
+      msg.fileURL ??
+      msg.mediaURL ??
+      msg.url ??
+      (contentObj?.url as string | undefined) ??
+      (contentObj?.fileURL as string | undefined) ??
+      (contentObj?.mediaURL as string | undefined) ??
+      (contentObj?.downloadUrl as string | undefined);
+    const mime =
+      msg.mimeType ??
+      msg.mimetype ??
+      (contentObj?.mimeType as string | undefined) ??
+      (contentObj?.mimetype as string | undefined);
+    const seconds =
+      msg.seconds ??
+      (contentObj?.seconds as number | undefined) ??
+      (contentObj?.duration as number | undefined);
 
     if (isAudio) {
-      media = { kind: 'audio' as InboundMediaKind, mimetype: mime, url: mediaUrl, seconds: msg.seconds };
+      media = { kind: 'audio' as InboundMediaKind, mimetype: mime, url: mediaUrl, seconds };
       if (!text) text = '[áudio]';
     } else if (isImage) {
       media = { kind: 'image' as InboundMediaKind, mimetype: mime, url: mediaUrl, caption: msg.caption };

@@ -280,117 +280,63 @@ export class UazapiClient {
    * Tenta primeiro a URL direta contida no webhook (quando houver);
    * se falhar, chama o endpoint oficial da Uazapi que recupera + descriptografa.
    */
+  /**
+   * Baixa mídia (áudio/imagem/vídeo/documento) de uma mensagem.
+   *
+   * Usa o endpoint oficial da Uazapi:
+   *   POST /message/download
+   *   { id, return_base64: true, return_link: false, download_quoted: false }
+   *
+   * O retorno contém o arquivo em base64 + mimetype, que é decodificado
+   * em buffer para o Whisper (áudio) ou Vision (imagem).
+   */
   async downloadMedia(params: {
     messageId: string;
     url?: string;
   }): Promise<DownloadedMedia> {
-    const attempts: string[] = [];
+    const res = await fetch(`${this.baseUrl}/message/download`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        token: this.token,
+      },
+      body: JSON.stringify({
+        id: params.messageId,
+        return_base64: true,
+        return_link: false,
+        download_quoted: false,
+      }),
+    });
 
-    // 1) URL direta (caso já venha completa e pública)
-    if (params.url) {
-      try {
-        const res = await fetch(params.url);
-        if (res.ok) {
-          const buffer = Buffer.from(await res.arrayBuffer());
-          return {
-            mimetype: res.headers.get('content-type') ?? 'application/octet-stream',
-            buffer,
-          };
-        }
-        attempts.push(`direct-url -> ${res.status}`);
-      } catch (err) {
-        attempts.push(`direct-url -> err:${(err as Error).message}`);
-      }
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(
+        `Uazapi /message/download falhou (${res.status}) id=${params.messageId}: ${errText.slice(0, 200)}`,
+      );
     }
 
-    // 2) Vários endpoints conhecidos da Uazapi (varia por versão)
-    const endpoints = [
-      // Mais comuns na Uazapi atual
-      `${this.baseUrl}/message/download`,
-      `${this.baseUrl}/message/downloadMedia`,
-      `${this.baseUrl}/messages/download`,
-      `${this.baseUrl}/messages/downloadMedia`,
-      `${this.baseUrl}/api/v1/message/download`,
-      `${this.baseUrl}/api/message/download`,
-      `${this.baseUrl}/getMedia`,
-    ];
+    const json = (await res.json()) as {
+      file?: string;
+      base64?: string;
+      data?: string;
+      mediaBase64?: string;
+      fileBase64?: string;
+      mimetype?: string;
+      mimeType?: string;
+    };
 
-    // Vários formatos de body que a Uazapi pode aceitar
-    const bodies: Array<Record<string, unknown>> = [
-      { id: params.messageId, messageid: params.messageId },
-      { messageid: params.messageId },
-      { messageId: params.messageId },
-      { id: params.messageId },
-    ];
-
-    for (const endpoint of endpoints) {
-      for (const body of bodies) {
-        try {
-          const res = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', token: this.token },
-            body: JSON.stringify(body),
-          });
-          if (!res.ok) {
-            attempts.push(`${endpoint} (${Object.keys(body).join(',')}) -> ${res.status}`);
-            continue;
-          }
-          // Tenta como JSON primeiro
-          const ct = res.headers.get('content-type') ?? '';
-          if (ct.includes('application/json')) {
-            const json = (await res.json()) as {
-              file?: string;
-              base64?: string;
-              data?: string;
-              mediaBase64?: string;
-              fileBase64?: string;
-              mimetype?: string;
-              mimeType?: string;
-              url?: string;
-              downloadUrl?: string;
-            };
-            const b64 = json.file ?? json.base64 ?? json.data ?? json.mediaBase64 ?? json.fileBase64;
-            if (b64) {
-              return {
-                mimetype: json.mimetype ?? json.mimeType ?? 'application/octet-stream',
-                buffer: Buffer.from(b64, 'base64'),
-              };
-            }
-            // Resposta pode vir com URL pra download (segunda etapa)
-            const downloadUrl = json.url ?? json.downloadUrl;
-            if (downloadUrl) {
-              const sub = await fetch(downloadUrl);
-              if (sub.ok) {
-                const buffer = Buffer.from(await sub.arrayBuffer());
-                return {
-                  mimetype: sub.headers.get('content-type') ?? 'application/octet-stream',
-                  buffer,
-                };
-              }
-              attempts.push(`${endpoint} -> ${downloadUrl} -> ${sub.status}`);
-            } else {
-              attempts.push(`${endpoint} ok mas sem b64/url no JSON`);
-            }
-          } else {
-            // Resposta direta (binário)
-            const buffer = Buffer.from(await res.arrayBuffer());
-            if (buffer.byteLength > 0) {
-              return {
-                mimetype: ct || 'application/octet-stream',
-                buffer,
-              };
-            }
-            attempts.push(`${endpoint} -> binário vazio`);
-          }
-        } catch (err) {
-          attempts.push(`${endpoint} -> err:${(err as Error).message}`);
-        }
-      }
+    const b64 = json.file ?? json.base64 ?? json.data ?? json.mediaBase64 ?? json.fileBase64;
+    if (!b64) {
+      throw new Error(
+        `Uazapi /message/download sem base64 no retorno id=${params.messageId}: ${JSON.stringify(json).slice(0, 200)}`,
+      );
     }
 
-    throw new Error(
-      `Uazapi media download failed for ${params.messageId}. Tentativas: ${attempts.slice(0, 6).join(' | ')}`,
-    );
+    return {
+      mimetype: json.mimetype ?? json.mimeType ?? 'application/octet-stream',
+      buffer: Buffer.from(b64, 'base64'),
+    };
   }
 
   /**

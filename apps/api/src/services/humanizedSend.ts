@@ -196,6 +196,7 @@ function typingDurationMs(text: string): number {
 export async function sendHumanized(input: HumanizedSendInput): Promise<HumanizedSendResult> {
   const chunks = splitForHuman(input.text);
   const ids: string[] = [];
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i]!;
@@ -203,19 +204,41 @@ export async function sendHumanized(input: HumanizedSendInput): Promise<Humanize
     if (i > 0) {
       // Pausa entre chunks (depois da chegada da mensagem anterior — leitura)
       const delay = humanDelayMs(chunks[i - 1]!);
-      await new Promise((r) => setTimeout(r, delay));
+      await sleep(delay);
     }
 
-    // Tempo de digitação (a Uazapi mostra "Digitando..." durante esse tempo
-    // se passarmos via param `delay` no sendText).
     const typing = typingDurationMs(chunk);
+
+    // Fluxo humanizado: NÃO passamos delayMs no sendText (isso "prende" a
+    // mensagem na Uazapi). Em vez disso:
+    //   1) marca como lido (✓✓ azul) — só no primeiro chunk
+    //   2) dispara presence "composing" → "Digitando..." aparece no app
+    //   3) await JS pelo tempo do typing (durante esse tempo o cliente vê
+    //      o "Digitando..." sem que a mensagem ja tenha chegado)
+    //   4) sendText sem delay → mensagem entregue imediato
+    if (i === 0) {
+      await uazapi
+        .markAsRead({ number: input.patientPhone, messageId: '' })
+        .catch(() => undefined);
+    }
+
+    await uazapi
+      .sendPresence({ number: input.patientPhone, presence: 'composing', delay: typing })
+      .catch(() => undefined);
+
+    await sleep(typing);
+
+    // Para de mostrar o "Digitando..." (algumas versões da Uazapi auto-param
+    // depois do `delay`, outras precisam de paused explícito)
+    void uazapi
+      .sendPresence({ number: input.patientPhone, presence: 'paused' })
+      .catch(() => undefined);
 
     try {
       const sent = await uazapi.sendText({
         number: input.patientPhone,
         text: chunk,
-        delayMs: typing,
-        // Só no primeiro chunk: marca as mensagens do paciente como lidas (check duplo azul)
+        delayMs: 0,
         readMessages: i === 0,
         readChat: i === 0,
       });

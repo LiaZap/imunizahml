@@ -126,33 +126,50 @@ export class UazapiClient {
   }
 
   /**
-   * Marca uma mensagem como lida (check duplo azul) na conversa do paciente.
-   * Aparece como "visualizado" no celular dele.
+   * Marca a conversa do paciente como lida (check duplo azul).
+   * Funciona enviando uma "mensagem fantasma" com texto vazio que apenas
+   * sinaliza readchat+readmessages = true. A Uazapi processa os flags
+   * mesmo sem texto.
+   *
+   * Alternativamente tenta endpoints dedicados se a Uazapi suportar.
    */
   async markAsRead(input: {
     number: string;
     messageId: string;
   }): Promise<void> {
+    // Endpoints dedicados (varia por versão da Uazapi)
     const endpoints = [
       `${this.baseUrl}/message/markRead`,
       `${this.baseUrl}/message/read`,
       `${this.baseUrl}/messages/markRead`,
       `${this.baseUrl}/chat/markRead`,
+      `${this.baseUrl}/chat/read`,
+      `${this.baseUrl}/sender/read`,
+      `${this.baseUrl}/sender/markRead`,
+    ];
+    const bodies: Array<Record<string, unknown>> = [
+      { id: input.messageId, number: input.number },
+      { messageid: input.messageId, number: input.number },
+      { messageId: input.messageId, number: input.number },
+      { number: input.number, readchat: true, readmessages: true },
+      { number: input.number },
     ];
     for (const endpoint of endpoints) {
-      try {
-        const res = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', token: this.token },
-          body: JSON.stringify({
-            number: input.number,
-            messageid: input.messageId,
-            id: input.messageId,
-          }),
-        });
-        if (res.ok) return;
-      } catch {
-        /* tenta próximo endpoint */
+      for (const body of bodies) {
+        try {
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+              token: this.token,
+            },
+            body: JSON.stringify(body),
+          });
+          if (res.ok) return;
+        } catch {
+          /* tenta próximo */
+        }
       }
     }
   }

@@ -151,8 +151,14 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
       media: inbound.media,
     });
 
-    // A marcação como "visualizado" agora é feita junto com o sendText
-    // da resposta da IA (via readMessages: true no humanizedSend).
+    // Marca como "visualizado" depois de 7s (simula a pessoa demorar
+    // pra abrir o WhatsApp). Fire-and-forget — não bloqueia a resposta
+    // do webhook nem o agent_turn.
+    setTimeout(() => {
+      void uazapi
+        .markAsRead({ number: inbound.from, messageId: inbound.id || '' })
+        .catch(() => undefined);
+    }, 7000);
 
     return reply.code(202).send({ status: 'queued' });
   });

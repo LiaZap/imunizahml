@@ -317,6 +317,7 @@ export class UazapiClient {
     }
 
     const json = (await res.json()) as {
+      base64Data?: string; // ← retorno padrão da Uazapi atual
       file?: string;
       base64?: string;
       data?: string;
@@ -326,7 +327,13 @@ export class UazapiClient {
       mimeType?: string;
     };
 
-    const b64 = json.file ?? json.base64 ?? json.data ?? json.mediaBase64 ?? json.fileBase64;
+    const b64 =
+      json.base64Data ??
+      json.file ??
+      json.base64 ??
+      json.data ??
+      json.mediaBase64 ??
+      json.fileBase64;
     if (!b64) {
       throw new Error(
         `Uazapi /message/download sem base64 no retorno id=${params.messageId}: ${JSON.stringify(json).slice(0, 200)}`,

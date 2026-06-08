@@ -201,6 +201,34 @@ export const functionHandlers: Record<
     const reason = String(args.reason ?? 'patient_request');
     const summary = String(args.summary ?? '').trim() || 'Paciente encaminhado ao atendimento humano.';
 
+    // ⛔ GATE: nao deixa transferir pra equipe sem ter o nome do paciente.
+    // A clinica precisa ter um nome pra contextualizar quando o atendente
+    // assumir. Se o agent chama handoff sem ter perguntado nome, devolve
+    // erro pedindo pra perguntar antes.
+    const patient = await prisma.patient.findUnique({
+      where: { id: ctx.patientId },
+      select: { name: true, profile: true },
+    });
+    const profileName = ((patient?.profile as Record<string, unknown> | null) ?? {}).name;
+    const hasName =
+      (typeof patient?.name === 'string' && patient.name.trim().length > 0) ||
+      (typeof profileName === 'string' && profileName.trim().length > 0);
+    if (!hasName) {
+      ctx.logger.info(
+        { conversationId: ctx.conversationId, reason },
+        'request_handoff bloqueado — paciente sem nome',
+      );
+      return {
+        name: 'request_handoff',
+        output: JSON.stringify({
+          ok: false,
+          error: 'patient_name_required',
+          message:
+            'Antes de transferir pra equipe, pergunte o nome do paciente e registre com update_patient_profile({ name }). Só depois chame request_handoff de novo.',
+        }),
+      };
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.conversation.update({
         where: { id: ctx.conversationId },

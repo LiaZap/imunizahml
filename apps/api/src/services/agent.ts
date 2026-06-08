@@ -13,7 +13,7 @@ import {
 } from './businessHours.js';
 import { prisma } from '@imuniza/db';
 
-const MAX_TOOL_ITERATIONS = 5;
+const MAX_TOOL_ITERATIONS = 8;
 
 interface RunAgentInput {
   tenantId: string;
@@ -100,6 +100,7 @@ export async function runAgent(input: RunAgentInput): Promise<void> {
   };
 
   let alreadySentInThisTurn = false;
+  let lastFinalText: string | null = null;
 
   for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
     const completion = await ai.client.chat.completions.create({
@@ -195,10 +196,32 @@ export async function runAgent(input: RunAgentInput): Promise<void> {
           { chunks: result.chunkCount },
           'agent emitted text without send_reply — relayed humanized',
         );
+        lastFinalText = finalText;
       } catch (err) {
         input.logger.error({ err }, 'fallback humanized send failed');
       }
     }
     break;
+  }
+
+  // Se o loop terminou SEM o modelo emitir texto final (so tool_calls
+  // ate atingir MAX_TOOL_ITERATIONS), o paciente fica sem resposta.
+  // Loga warning + manda mensagem padrão pra nao deixar o paciente no escuro.
+  if (!alreadySentInThisTurn && !lastFinalText) {
+    input.logger.warn(
+      { conversationId: input.conversationId, maxIterations: MAX_TOOL_ITERATIONS },
+      'agent loop terminated WITHOUT final text (max tool iterations) — sending fallback msg',
+    );
+    try {
+      await sendHumanized({
+        conversationId: input.conversationId,
+        patientPhone: input.patientPhone,
+        text: 'Deixa eu verificar isso direitinho com nossa equipe e já te aviso, um instante!',
+        metadataBase: { fallbackMaxIterations: true },
+        logger: input.logger,
+      });
+    } catch (err) {
+      input.logger.error({ err }, 'fallback max-iterations send failed');
+    }
   }
 }

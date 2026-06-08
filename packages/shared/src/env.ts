@@ -15,8 +15,10 @@ const envSchema = z.object({
   UAZAPI_INSTANCE: z.string().default(''),
   UAZAPI_WEBHOOK_SECRET: z.string().min(8),
 
-  /** Delay do debounce das mensagens do paciente antes da IA responder (ms). */
-  MESSAGE_BUFFER_MS: z.coerce.number().int().min(0).max(30_000).default(2500),
+  /** Delay do debounce das mensagens do paciente antes da IA responder (ms).
+   *  8s dá respiro pra mensagens picadas típicas do WhatsApp (várias frases
+   *  curtas em sequência) sem disparar a IA antes do paciente terminar. */
+  MESSAGE_BUFFER_MS: z.coerce.number().int().min(0).max(30_000).default(8000),
 
   /** Quanto tempo a IA fica pausada depois que um humano respondeu pelo numero real. */
   AI_HUMAN_OVERRIDE_PAUSE_MS: z.coerce

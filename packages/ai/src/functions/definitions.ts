@@ -58,11 +58,15 @@ export const functionDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] =
     function: {
       name: 'list_vaccines',
       description:
-        'Lista vacinas disponíveis com preços e idades. Filtros opcionais por idade em meses.',
+        'Lista vacinas disponíveis no catálogo com preços, estoque e idades recomendadas. NÃO filtra por idade — sempre retorna o catálogo completo (ou um subset filtrado por nome). Use SEMPRE que o paciente perguntar preço/estoque/disponibilidade de uma vacina específica (ex: "qual o preço da gripe?", "tem HPV?"). Para recomendação por idade, use `recommend_vaccines`.',
       parameters: {
         type: 'object',
         properties: {
-          ageMonths: { type: 'integer', minimum: 0 },
+          nameLike: {
+            type: 'string',
+            description:
+              'Filtro opcional por substring do nome/slug/descrição (case-insensitive). Ex: "gripe", "HPV", "meningo", "pneumo". Se omitido, retorna todas as vacinas.',
+          },
         },
         additionalProperties: false,
       },

@@ -98,24 +98,38 @@ export const functionHandlers: Record<
   },
 
   async list_vaccines(args, ctx) {
-    const ageMonths = args.ageMonths != null ? Number(args.ageMonths) : null;
+    const nameLike = typeof args.nameLike === 'string' ? args.nameLike.toLowerCase().trim() : null;
     const vaccines = await prisma.vaccine.findMany({
       where: { tenantId: ctx.tenantId, active: true },
       orderBy: { name: 'asc' },
     });
 
-    const filtered =
-      ageMonths != null ? vaccines.filter((v) => v.ageMonths.includes(ageMonths)) : vaccines;
+    // IMPORTANTE: list_vaccines NAO filtra por idade. Quando o paciente
+    // pergunta "qual o preco da vacina X?", devolvemos TODAS as vacinas
+    // (ou as que batem com nameLike) — quem decide se faz sentido pra
+    // idade do paciente eh a IA. Filtrar por idade aqui ja causou bug:
+    // adulto perguntava HPV/gripe -> banco filtrava por ageMonths.includes
+    // -> retornava vazio -> IA achava que estava em falta.
+    //
+    // Pra recomendar por idade, use a outra funcao: `recommend_vaccines`.
+    const filtered = nameLike
+      ? vaccines.filter((v) =>
+          v.name.toLowerCase().includes(nameLike) ||
+          v.slug.toLowerCase().includes(nameLike) ||
+          (v.description ?? '').toLowerCase().includes(nameLike),
+        )
+      : vaccines;
 
     return {
       name: 'list_vaccines',
       output: JSON.stringify({
-        // priceCash JA EH o valor com desconto a vista (PIX/dinheiro).
-        // priceInstallment eh o TOTAL parcelado em ate `installments` vezes.
         priceCashMeaning: 'a vista (dinheiro ou PIX) — preço final, ja com desconto',
         priceInstallmentMeaning: 'total parcelado no cartao em ate `installments` vezes',
         stockMeaning:
           'inStock=false significa que a vacina esta em falta. Informe o paciente e ofereca anotar nome em lista de espera (chame request_handoff com reason=waitlist)',
+        searchMeaning: nameLike
+          ? `resultados filtrados por nome contendo "${nameLike}"`
+          : 'catalogo completo (sem filtro)',
         vaccines: filtered.map((v) => ({
           name: v.name,
           slug: v.slug,

@@ -151,14 +151,11 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
       media: inbound.media,
     });
 
-    // Marca como "visualizado" depois de 7s (simula a pessoa demorar
-    // pra abrir o WhatsApp). Fire-and-forget — não bloqueia a resposta
-    // do webhook nem o agent_turn.
-    setTimeout(() => {
-      void uazapi
-        .markAsRead({ number: inbound.from, messageId: inbound.id || '' })
-        .catch(() => undefined);
-    }, 7000);
+    // O "visualizado" (✓✓ azul) é disparado JUNTO com o "Digitando..." pelo
+    // sendText do primeiro chunk (flag `readMessages: true` na Uazapi).
+    // Isso sincroniza com o tempo da IA processar: paciente vê ✓✓ azul e
+    // "Digitando..." aparecer juntos, como uma pessoa que abre o app e
+    // começa a responder. Sem setTimeout standalone aqui.
 
     return reply.code(202).send({ status: 'queued' });
   });

@@ -53,11 +53,13 @@ export function splitForHuman(rawText: string): string[] {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  // 2ª camada: dentro de cada parágrafo, se houver bullets, cada bullet vira sub-parte
+  // 2ª camada: dentro de cada parágrafo, se houver bullets, separa o texto
+  // introdutório (antes do 1º bullet) dos bullets em si — mas os bullets
+  // ficam JUNTOS num mesmo chunk (lista inteira em 1 mensagem só), pra
+  // não picotar a conversa.
   const afterBullets: string[] = [];
   for (const p of parts) {
     if (/(^|\n)\s*•\s+/.test(p)) {
-      // Separa o texto introdutório (antes do 1º bullet) dos bullets em si
       const lines = p.split(/\n/);
       const intro: string[] = [];
       const bullets: string[] = [];
@@ -79,7 +81,10 @@ export function splitForHuman(rawText: string): string[] {
       }
       const introText = intro.join(' ').trim();
       if (introText) afterBullets.push(introText);
-      for (const b of bullets) afterBullets.push(b);
+      if (bullets.length > 0) {
+        // Lista inteira num único chunk
+        afterBullets.push(bullets.join('\n'));
+      }
     } else {
       afterBullets.push(p);
     }

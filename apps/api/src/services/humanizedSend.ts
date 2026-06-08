@@ -171,11 +171,18 @@ interface HumanizedSendResult {
  * como Message individual no banco com seu uazapiMessageId.
  */
 /**
- * Tempo de "digitação" antes de enviar um chunk. Maior pra textos longos.
- * ~30 caracteres por segundo, mínimo 700ms, máximo 3000ms.
+ * Tempo de "digitação" antes de enviar um chunk.
+ * Janela 10-15s para parecer pessoa real digitando no celular.
+ * Texto curto fica perto de 10s, texto longo perto de 15s.
  */
 function typingDurationMs(text: string): number {
-  return Math.min(3000, Math.max(700, Math.floor(text.length * 33)));
+  const minMs = 10_000;
+  const maxMs = 15_000;
+  // Quanto maior o texto, mais perto do maximo (saturando em 150 chars)
+  const lengthRatio = Math.min(1, text.length / 150);
+  const base = minMs + Math.floor(lengthRatio * (maxMs - minMs));
+  const jitter = Math.floor(Math.random() * 1000) - 500; // ±500ms
+  return Math.max(minMs, Math.min(maxMs, base + jitter));
 }
 
 export async function sendHumanized(input: HumanizedSendInput): Promise<HumanizedSendResult> {

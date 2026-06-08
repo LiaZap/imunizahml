@@ -36,7 +36,13 @@ export async function runAgent(input: RunAgentInput): Promise<void> {
   const personaConfig = (tenant.config as TenantPersonaConfig | null) ?? {};
 
   const patient = await prisma.patient.findUnique({ where: { id: input.patientId } });
-  const profile = patient?.profile ?? {};
+  // IMPORTANTE: filtra pushName antes de injetar no system prompt.
+  // pushName eh o display name do WhatsApp (ex: "Paulo Melo - Gestor de
+  // Automacao") — NAO eh o nome confirmado pelo paciente. Se vazasse
+  // pra IA, ela extrai o primeiro nome e usa como se tivesse perguntado.
+  // Isso quebra a regra "pergunte o nome antes de qualquer coisa".
+  const rawProfile = (patient?.profile as Record<string, unknown> | null) ?? {};
+  const { pushName: _pushName, ...profile } = rawProfile;
   const history = await loadHistory(input.conversationId, 20);
 
   const system = buildSystemPrompt({
@@ -102,6 +108,15 @@ export async function runAgent(input: RunAgentInput): Promise<void> {
   let alreadySentInThisTurn = false;
   let lastFinalText: string | null = null;
 
+  input.logger.info(
+    {
+      conversationId: input.conversationId,
+      historyLen: messages.length,
+      lastUserMsg: messages[messages.length - 1]?.content?.toString().slice(0, 80),
+    },
+    'agent loop start',
+  );
+
   for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
     const completion = await ai.client.chat.completions.create({
       model: ai.chatModel,
@@ -112,9 +127,22 @@ export async function runAgent(input: RunAgentInput): Promise<void> {
     });
 
     const choice = completion.choices[0];
-    if (!choice) break;
+    if (!choice) {
+      input.logger.warn({ iter }, 'agent: no choice returned, breaking');
+      break;
+    }
 
     const assistantMsg = choice.message;
+    input.logger.debug(
+      {
+        iter,
+        finishReason: choice.finish_reason,
+        contentLen: (assistantMsg.content ?? '').length,
+        toolCallCount: assistantMsg.tool_calls?.length ?? 0,
+        toolNames: assistantMsg.tool_calls?.map((t) => t.type === 'function' ? t.function.name : '?'),
+      },
+      'agent iter response',
+    );
 
     if (assistantMsg.tool_calls && assistantMsg.tool_calls.length > 0) {
       messages.push({

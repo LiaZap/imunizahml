@@ -8,6 +8,7 @@ import {
   Check,
   Clock,
   Copy,
+  Lock,
   MessageCircle,
   Moon,
   Plus,
@@ -20,7 +21,10 @@ import { api } from '@/lib/api-client';
 import type { TenantSettings } from '@/lib/types';
 
 export function SettingsForm({ initial }: { initial: TenantSettings }) {
-  const [persona, setPersona] = useState(initial.config.persona ?? '');
+  // Persona NÃO eh mais editavel via UI — gerenciada pelo time tecnico
+  // (versionada no repo + script `prisma/demo-persona.ts`). Exibida aqui
+  // so como read-only pra admin saber qual eh a versao ativa.
+  const persona = initial.config.persona ?? '';
   const [greeting, setGreeting] = useState(initial.config.greeting ?? '');
   const [phone, setPhone] = useState(initial.phone ?? '');
   const [hoursStart, setHoursStart] = useState(initial.config.businessHours?.start ?? '08:00');
@@ -161,7 +165,8 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
       await api('/settings', {
         method: 'PATCH',
         body: JSON.stringify({
-          persona,
+          // persona NAO eh enviada — gerenciada via codigo (script
+          // prisma/demo-persona.ts). Backend tambem rejeita esse campo.
           greeting,
           phone: phone || undefined,
           businessHours: { start: hoursStart, end: hoursEnd, timezone },
@@ -207,18 +212,27 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
       <Section
         icon={Sparkles}
         title="Persona da IA"
-        description="Tom de voz e instruções gerais. Mudanças afetam a próxima resposta."
+        description="Tom de voz e regras de atendimento da IA."
       >
-        <Field label="Instruções de persona">
-          <textarea
-            value={persona}
-            onChange={(e) => setPersona(e.target.value)}
-            rows={5}
-            required
-            className="input"
-            placeholder="Ex.: Seja acolhedora, clara e breve. Use tom próximo, evite termos técnicos."
-          />
-        </Field>
+        <div className="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+          <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            <p className="font-semibold">Gerenciada pelo time técnico</p>
+            <p className="mt-0.5 text-amber-700">
+              A persona da IA é versionada no código pra garantir consistência e rastreabilidade
+              (cada mudança passa por revisão e teste). Pra solicitar alterações, fale com o
+              suporte/equipe técnica.
+            </p>
+          </div>
+        </div>
+        <details className="rounded-xl border border-slate-200 bg-slate-50">
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+            Ver persona ativa ({persona.length.toLocaleString('pt-BR')} caracteres)
+          </summary>
+          <pre className="max-h-96 overflow-auto whitespace-pre-wrap border-t border-slate-200 p-4 font-mono text-[11px] leading-relaxed text-slate-600">
+            {persona || '(persona não definida — rodar script prisma/demo-persona.ts)'}
+          </pre>
+        </details>
       </Section>
 
       <Section

@@ -2,9 +2,14 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { Prisma, prisma } from '@imuniza/db';
 
-const configBody = z.object({
-  persona: z.string().min(1).optional(),
-  greeting: z.string().min(1).optional(),
+// IMPORTANTE: `persona` NAO eh aceita no PATCH. A persona da IA eh
+// versionada no codigo (packages/db/prisma/demo-persona.ts) e
+// aplicada via script. Defesa em profundidade: mesmo se o frontend
+// tentar enviar, o schema rejeita silenciosamente (passthrough off
+// + strict).
+const configBody = z
+  .object({
+    greeting: z.string().min(1).optional(),
   businessHours: z
     .object({
       start: z.string(),
@@ -31,7 +36,8 @@ const configBody = z.object({
       enabled: z.boolean().optional(),
     })
     .optional(),
-});
+  })
+  .strict(); // rejeita campos desconhecidos (inclusive `persona`)
 
 export async function settingsRoutes(app: FastifyInstance): Promise<void> {
   app.get('/', async (req) => {
@@ -59,7 +65,7 @@ export async function settingsRoutes(app: FastifyInstance): Promise<void> {
 
     const currentConfig = (tenant.config as Record<string, unknown>) ?? {};
     const newConfig: Record<string, unknown> = { ...currentConfig };
-    if (body.persona !== undefined) newConfig.persona = body.persona;
+    // persona NAO eh atualizavel via API — gerenciada via codigo
     if (body.greeting !== undefined) newConfig.greeting = body.greeting;
     if (body.businessHours !== undefined) newConfig.businessHours = body.businessHours;
     if (body.silentHours !== undefined) newConfig.silentHours = body.silentHours;

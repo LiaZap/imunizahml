@@ -83,6 +83,13 @@ let handoffCalled = false;
 
 function execTool(name: string, args: Record<string, unknown>): string {
   toolsCalled.push(name);
+  if (name === 'list_packages') {
+    const nameLike = String(args.nameLike ?? '').toLowerCase();
+    const filtered = nameLike
+      ? mockPackages.filter((p) => p.name.toLowerCase().includes(nameLike) || p.slug.toLowerCase().includes(nameLike))
+      : mockPackages;
+    return JSON.stringify({ packages: filtered });
+  }
   if (name === 'list_vaccines') {
     const nameLike = String(args.nameLike ?? '').toLowerCase();
     const filtered = nameLike
@@ -240,6 +247,37 @@ const SCENARIOS: Scenario[] = [
       ...required(contains(full, 'febre amarela'), 'não falou de febre amarela'),
       ...required(contains(full, '30 dias') || contains(full, 'intervalo'), 'não mencionou intervalo 30 dias'),
       ...required(contains(full, 'exceção') || contains(full, 'única') || contains(full, 'separad'), 'não destacou que é exceção'),
+    ],
+  },
+  {
+    id: 'pacote-hpv-3-doses',
+    title: 'Tem pacote HPV com as 3 doses? → SIM, R$ 2.712',
+    conversation: [
+      { role: 'user', content: 'quanto custa a vacina HPV?' },
+      { role: 'assistant', content: 'Como te chamar? Pra quem é? Qual a idade?' },
+      { role: 'user', content: 'Sou Fernanda, pra minha filha de 11 anos' },
+      { role: 'assistant', content: '[apresenta HPV 9 R$ 924 em 3x]' },
+      { role: 'user', content: 'tem pacote com as 3 doses?' },
+    ],
+    expect: (full, tools) => [
+      ...required(tools.includes('list_packages'), 'não chamou list_packages'),
+      ...required(contains(full, '2712') || contains(full, '2.712') || contains(full, '966'), 'sem preço do pacote HPV 9 (R$ 2.712 ou 3x R$ 966,65)'),
+      ...required(!contains(full, 'não temos') && !contains(full, 'sem pacote'), 'IA disse que NÃO tem pacote (deveria ter)'),
+      ...noBadInstallments(full),
+    ],
+  },
+  {
+    id: 'pacote-2-6m',
+    title: 'Pacote 2-6 meses → SIM, R$ 5.067',
+    conversation: [
+      { role: 'user', content: 'tem pacote pra bebê de 2 a 6 meses?' },
+      { role: 'assistant', content: 'Como te chamar?' },
+      { role: 'user', content: 'Sou Bia' },
+    ],
+    expect: (full, tools) => [
+      ...required(tools.includes('list_packages'), 'não chamou list_packages'),
+      ...required(contains(full, '5067') || contains(full, '5.067') || contains(full, '1.806') || contains(full, '1806'), 'sem preço do pacote 2-6m'),
+      ...noBadInstallments(full),
     ],
   },
   {

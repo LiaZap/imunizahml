@@ -153,6 +153,42 @@ export const functionHandlers: Record<
     };
   },
 
+  async list_packages(args, ctx) {
+    const nameLike = typeof args.nameLike === 'string' ? args.nameLike.toLowerCase().trim() : null;
+    const all = await prisma.vaccinePackage.findMany({
+      where: { tenantId: ctx.tenantId, active: true },
+      orderBy: { name: 'asc' },
+    });
+    const filtered = nameLike
+      ? all.filter(
+          (p) =>
+            p.name.toLowerCase().includes(nameLike) ||
+            p.slug.toLowerCase().includes(nameLike) ||
+            (p.description ?? '').toLowerCase().includes(nameLike),
+        )
+      : all;
+
+    return {
+      name: 'list_packages',
+      output: JSON.stringify({
+        priceCashMeaning: 'a vista (dinheiro ou PIX) — preço final, ja com desconto',
+        priceInstallmentMeaning: 'total parcelado no cartao em ate `installments` vezes',
+        searchMeaning: nameLike
+          ? `pacotes filtrados por nome contendo "${nameLike}"`
+          : 'todos os pacotes ativos',
+        packages: filtered.map((p) => ({
+          name: p.name,
+          slug: p.slug,
+          description: p.description,
+          items: p.items, // composição: { vaccineSlug, doses }[]
+          priceCash: Number(p.priceCash),
+          priceInstallment: Number(p.priceInstallment),
+          installments: p.installments,
+        })),
+      }),
+    };
+  },
+
   async recommend_vaccines(args, ctx) {
     const ageMonths = Number(args.ageMonths);
     if (!Number.isFinite(ageMonths)) {

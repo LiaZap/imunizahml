@@ -97,6 +97,25 @@ export const functionDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] =
   {
     type: 'function',
     function: {
+      name: 'list_packages',
+      description:
+        'Lista PACOTES de vacinas disponíveis (ex: pacote 2-6 meses, pacote HPV 9 com 3 doses, pacote 1a-1a6m). Use SEMPRE que o paciente perguntar sobre pacotes/combos/fechado/3 doses do HPV/pacote completo/desconto/economia. NÃO assuma que não existe — sempre consulte primeiro. Mesma idéia do list_vaccines mas pra pacotes.',
+      parameters: {
+        type: 'object',
+        properties: {
+          nameLike: {
+            type: 'string',
+            description:
+              'Filtro opcional por substring do nome/slug/descrição do pacote (case-insensitive). Ex: "hpv", "2-6", "bebê". Se omitido, retorna todos os pacotes ativos.',
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'request_handoff',
       description:
         'Encaminha o paciente para a equipe humana (fila de agendamento). Use quando o paciente quiser agendar, tiver dúvida que você não pode resolver, ou sintoma preocupante.',

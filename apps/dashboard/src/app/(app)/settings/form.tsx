@@ -115,6 +115,10 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
       setSheetsBusy(false);
     }
   }
+  function errMsg(err: unknown): string {
+    const e = err as { message?: string; body?: { error?: string } };
+    return e.body?.error ?? e.message ?? 'erro desconhecido';
+  }
   async function runPreview() {
     setSheetsBusy(true);
     setSheetsMsg(null);
@@ -127,7 +131,7 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
         text: `Pré-visualização: ${r.matched} encontradas, ${r.unmatched} sem correspondência.`,
       });
     } catch (err) {
-      setSheetsMsg({ kind: 'err', text: `Erro: ${(err as Error).message}` });
+      setSheetsMsg({ kind: 'err', text: `Erro: ${errMsg(err)}` });
     } finally {
       setSheetsBusy(false);
     }
@@ -146,7 +150,7 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
       });
       await refreshSheetsCfg();
     } catch (err) {
-      setSheetsMsg({ kind: 'err', text: `Erro: ${(err as Error).message}` });
+      setSheetsMsg({ kind: 'err', text: `Erro: ${errMsg(err)}` });
     } finally {
       setSheetsBusy(false);
     }

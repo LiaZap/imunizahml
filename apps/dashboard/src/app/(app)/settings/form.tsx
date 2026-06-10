@@ -71,6 +71,7 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
     installments: number;
     matchType: 'exact' | 'fuzzy' | 'unmatched';
     prevPriceCash?: number;
+    kind: 'vaccine' | 'package';
   };
   type SyncReport = {
     total: number;
@@ -557,7 +558,14 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
               <tbody>
                 {sheetsReport.matches.map((m, i) => (
                   <tr key={i} className="border-t border-slate-200">
-                    <td className="py-1.5 pr-2 font-mono">{m.sheetName}</td>
+                    <td className="py-1.5 pr-2 font-mono">
+                      {m.kind === 'package' && (
+                        <span className="mr-1 rounded bg-purple-50 px-1 py-0.5 text-[10px] text-purple-700">
+                          PCT
+                        </span>
+                      )}
+                      {m.sheetName}
+                    </td>
                     <td className="py-1.5 pr-2 text-slate-600">{m.matchedDbName ?? '—'}</td>
                     <td className="py-1.5 pr-2">
                       {m.prevPriceCash != null && (

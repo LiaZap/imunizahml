@@ -42,6 +42,8 @@ export function buildAuthUrl(state: string): string {
     scope: [
       'https://www.googleapis.com/auth/calendar',
       'https://www.googleapis.com/auth/userinfo.email',
+      // Sheets read-only — pra sincronizar a tabela de vacinas da clínica
+      'https://www.googleapis.com/auth/spreadsheets.readonly',
     ],
     state,
   });

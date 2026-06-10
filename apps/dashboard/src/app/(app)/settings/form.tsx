@@ -8,6 +8,7 @@ import {
   Check,
   Clock,
   Copy,
+  FileSpreadsheet,
   Lock,
   MessageCircle,
   Moon,
@@ -52,6 +53,104 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
   const [icalUrl, setIcalUrl] = useState<string | null>(null);
   const [icalLoading, setIcalLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+
+  // ── Google Sheets ──
+  type SheetsCfg = {
+    googleConnected: boolean;
+    spreadsheetId: string | null;
+    range: string | null;
+    lastSyncAt: string | null;
+    lastSyncCount: number | null;
+  };
+  type SyncMatch = {
+    sheetName: string;
+    matchedSlug: string | null;
+    matchedDbName: string | null;
+    priceCash: number;
+    priceInstallment: number;
+    installments: number;
+    matchType: 'exact' | 'fuzzy' | 'unmatched';
+    prevPriceCash?: number;
+  };
+  type SyncReport = {
+    total: number;
+    matched: number;
+    unmatched: number;
+    updated: number;
+    unchanged: number;
+    matches: SyncMatch[];
+  };
+  const [sheetsCfg, setSheetsCfg] = useState<SheetsCfg | null>(null);
+  const [sheetIdInput, setSheetIdInput] = useState('');
+  const [sheetsBusy, setSheetsBusy] = useState(false);
+  const [sheetsReport, setSheetsReport] = useState<SyncReport | null>(null);
+  const [sheetsMsg, setSheetsMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+
+  async function refreshSheetsCfg() {
+    try {
+      const c = await api<SheetsCfg>('/sheets/config');
+      setSheetsCfg(c);
+      if (c.spreadsheetId) setSheetIdInput(c.spreadsheetId);
+    } catch {
+      /* ignore */
+    }
+  }
+  useEffect(() => {
+    refreshSheetsCfg();
+  }, []);
+
+  async function saveSheetId() {
+    setSheetsBusy(true);
+    setSheetsMsg(null);
+    try {
+      await api('/sheets/config', {
+        method: 'PATCH',
+        body: JSON.stringify({ spreadsheetId: sheetIdInput.trim() }),
+      });
+      await refreshSheetsCfg();
+      setSheetsMsg({ kind: 'ok', text: 'ID da planilha salvo.' });
+    } catch (err) {
+      setSheetsMsg({ kind: 'err', text: `Erro: ${(err as Error).message}` });
+    } finally {
+      setSheetsBusy(false);
+    }
+  }
+  async function runPreview() {
+    setSheetsBusy(true);
+    setSheetsMsg(null);
+    setSheetsReport(null);
+    try {
+      const r = await api<SyncReport>('/sheets/vaccines/preview', { method: 'POST', body: '{}' });
+      setSheetsReport(r);
+      setSheetsMsg({
+        kind: 'ok',
+        text: `Pré-visualização: ${r.matched} encontradas, ${r.unmatched} sem correspondência.`,
+      });
+    } catch (err) {
+      setSheetsMsg({ kind: 'err', text: `Erro: ${(err as Error).message}` });
+    } finally {
+      setSheetsBusy(false);
+    }
+  }
+  async function runSync() {
+    if (!confirm('Aplicar mudanças no banco? Vai atualizar os preços das vacinas que casaram.'))
+      return;
+    setSheetsBusy(true);
+    setSheetsMsg(null);
+    try {
+      const r = await api<SyncReport>('/sheets/vaccines/sync', { method: 'POST', body: '{}' });
+      setSheetsReport(r);
+      setSheetsMsg({
+        kind: 'ok',
+        text: `Sync ok: ${r.updated} atualizadas, ${r.unchanged} já estavam iguais, ${r.unmatched} sem correspondência.`,
+      });
+      await refreshSheetsCfg();
+    } catch (err) {
+      setSheetsMsg({ kind: 'err', text: `Erro: ${(err as Error).message}` });
+    } finally {
+      setSheetsBusy(false);
+    }
+  }
 
   // Busca o URL do iCal na 1a renderização
   useEffect(() => {
@@ -373,6 +472,123 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
             </div>
           )}
         </div>
+      </Section>
+
+      <Section
+        icon={FileSpreadsheet}
+        title="Tabela de vacinas (Google Sheets)"
+        description="Cole o ID da planilha. Sincronize quando quiser pra puxar preços/parcelamento direto do Sheets."
+      >
+        {!sheetsCfg?.googleConnected && (
+          <div className="mb-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
+            ⚠️ Conecte primeiro o Google (seção acima). Se já tinha conectado antes do
+            suporte a Sheets, <b>desconecte e reconecte</b> pra autorizar o scope novo de
+            planilhas.
+          </div>
+        )}
+        <Field label="ID da planilha (entre /d/ e /edit na URL)">
+          <div className="flex items-center gap-2">
+            <input
+              value={sheetIdInput}
+              onChange={(e) => setSheetIdInput(e.target.value)}
+              placeholder="1s2FZZ_Ifv7362c2s5ewFKEP4h3mNO1j2"
+              className="input flex-1 font-mono text-xs"
+            />
+            <button
+              type="button"
+              onClick={saveSheetId}
+              disabled={sheetsBusy || !sheetIdInput.trim()}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+            >
+              Salvar
+            </button>
+          </div>
+        </Field>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={runPreview}
+            disabled={sheetsBusy || !sheetsCfg?.spreadsheetId || !sheetsCfg?.googleConnected}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${sheetsBusy ? 'animate-spin' : ''}`} />
+            Pré-visualizar
+          </button>
+          <button
+            type="button"
+            onClick={runSync}
+            disabled={sheetsBusy || !sheetsCfg?.spreadsheetId || !sheetsCfg?.googleConnected}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-brand px-3 py-2 text-xs font-semibold text-white shadow-card hover:bg-brand-deep disabled:opacity-50"
+          >
+            Sincronizar agora
+          </button>
+          {sheetsCfg?.lastSyncAt && (
+            <span className="text-[11px] text-slate-500">
+              Último sync: {new Date(sheetsCfg.lastSyncAt).toLocaleString('pt-BR')}
+              {sheetsCfg.lastSyncCount != null && <> ({sheetsCfg.lastSyncCount} atualizadas)</>}
+            </span>
+          )}
+        </div>
+        {sheetsMsg && (
+          <p
+            className={`mt-2 text-xs ${
+              sheetsMsg.kind === 'ok' ? 'text-brand-deep' : 'text-red-600'
+            }`}
+          >
+            {sheetsMsg.text}
+          </p>
+        )}
+        {sheetsReport && sheetsReport.matches.length > 0 && (
+          <div className="mt-3 max-h-80 overflow-auto rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="text-left text-slate-500">
+                  <th className="pb-1.5 font-semibold">Planilha</th>
+                  <th className="pb-1.5 font-semibold">Banco</th>
+                  <th className="pb-1.5 font-semibold">Preço (antes → depois)</th>
+                  <th className="pb-1.5 font-semibold">3x</th>
+                  <th className="pb-1.5 font-semibold">Match</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sheetsReport.matches.map((m, i) => (
+                  <tr key={i} className="border-t border-slate-200">
+                    <td className="py-1.5 pr-2 font-mono">{m.sheetName}</td>
+                    <td className="py-1.5 pr-2 text-slate-600">{m.matchedDbName ?? '—'}</td>
+                    <td className="py-1.5 pr-2">
+                      {m.prevPriceCash != null && (
+                        <span className="text-slate-400">
+                          R$ {m.prevPriceCash.toFixed(2).replace('.', ',')} →{' '}
+                        </span>
+                      )}
+                      <b>R$ {m.priceCash.toFixed(2).replace('.', ',')}</b>
+                    </td>
+                    <td className="py-1.5 pr-2 text-slate-600">
+                      3× R$ {(m.priceInstallment / 3).toFixed(2).replace('.', ',')}
+                    </td>
+                    <td className="py-1.5 pr-2">
+                      {m.matchType === 'exact' && (
+                        <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">
+                          ✓ exata
+                        </span>
+                      )}
+                      {m.matchType === 'fuzzy' && (
+                        <span className="rounded bg-blue-50 px-1.5 py-0.5 text-blue-700">
+                          ~ aproximada
+                        </span>
+                      )}
+                      {m.matchType === 'unmatched' && (
+                        <span className="rounded bg-amber-50 px-1.5 py-0.5 text-amber-700">
+                          ⚠ não casou
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Section>
 
       <Section

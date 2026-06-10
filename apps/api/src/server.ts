@@ -20,6 +20,7 @@ import { appointmentsRoutes } from './routes/appointments.js';
 import { instanceRoutes } from './routes/instance.js';
 import { publicCalendarRoutes, adminCalendarRoutes } from './routes/calendar.js';
 import { googleAdminRoutes, googlePublicRoutes } from './routes/google.js';
+import { sheetsRoutes } from './routes/sheets.js';
 import { authGuard } from './plugins/authGuard.js';
 import { startIncomingMessageWorker } from './workers/incomingMessage.js';
 import { startAgentTurnWorker } from './workers/agentTurn.js';
@@ -98,6 +99,7 @@ async function buildServer() {
     await instance.register(instanceRoutes, { prefix: '/instance' });
     await instance.register(adminCalendarRoutes, { prefix: '/calendar' });
     await instance.register(googleAdminRoutes, { prefix: '/google' });
+    await instance.register(sheetsRoutes, { prefix: '/sheets' });
   });
 
   return app;

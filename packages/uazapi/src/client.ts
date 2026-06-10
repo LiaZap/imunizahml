@@ -247,10 +247,13 @@ export class UazapiClient {
     let state: InstanceConnectionState = 'unknown';
     if (rawState) {
       const s = rawState.toLowerCase();
-      if (s.includes('connected') || s === 'open') state = 'connected';
-      else if (s.includes('connect') || s === 'loading') state = 'connecting';
+      // IMPORTANTE: checa "disconn" PRIMEIRO. A string "disconnected" contem
+      // "connected" como substring — se checasse connected primeiro, uma
+      // instância desconectada apareceria como conectada no painel.
+      if (s.includes('disconn') || s === 'close' || s === 'closed') state = 'disconnected';
       else if (s.includes('pair') || s.includes('qr')) state = 'pairing';
-      else if (s.includes('disconn') || s === 'close' || s === 'closed') state = 'disconnected';
+      else if (s === 'connected' || s === 'open' || s.includes('online')) state = 'connected';
+      else if (s.includes('connect') || s === 'loading') state = 'connecting';
     }
 
     const qrcode =

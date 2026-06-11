@@ -43,7 +43,7 @@ export async function runAgent(input: RunAgentInput): Promise<void> {
   // Isso quebra a regra "pergunte o nome antes de qualquer coisa".
   const rawProfile = (patient?.profile as Record<string, unknown> | null) ?? {};
   const { pushName: _pushName, ...profile } = rawProfile;
-  const history = await loadHistory(input.conversationId, 20);
+  const history = await loadHistory(input.conversationId, 35);
 
   const system = buildSystemPrompt({
     clinicName: tenant.name,

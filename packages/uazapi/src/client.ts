@@ -436,8 +436,19 @@ export class UazapiClient {
 
     const fromMe = msg.fromMe === true;
 
-    // Extrair telefone: chatid = "5511xxx@s.whatsapp.net" → "5511xxx"
-    const rawFrom = msg.sender_pn ?? msg.chatid ?? '';
+    // Extrair telefone do "outro lado" (o paciente):
+    //  - fromMe=false → mensagem recebida do paciente; sender_pn = paciente
+    //  - fromMe=true  → mensagem enviada pela clinica; sender_pn = clinica
+    //                   mas chatid = paciente (o outro lado do chat)
+    //
+    // Se usassemos sender_pn pra fromMe=true, terminariamos buscando uma
+    // conversa onde "patient.phone = numero da clinica" — que nao existe.
+    // Resultado: conversa real do paciente nao recebia o role='human' e a
+    // IA continuava respondendo por cima do atendente. Sempre usar chatid
+    // pra ter o numero do paciente, independente da direcao.
+    const chatPhoneRaw = msg.chatid ?? msg.sender_pn ?? '';
+    const senderPhoneRaw = msg.sender_pn ?? msg.chatid ?? '';
+    const rawFrom = fromMe ? chatPhoneRaw : senderPhoneRaw;
     const from = rawFrom.replace(/@.*/, '').replace(/:\d+$/, '');
     if (!from) return null;
 

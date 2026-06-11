@@ -47,31 +47,6 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
 
     const inbound = uazapi.parseInbound(parsed.data);
 
-    // DEBUG temporario: loga payload completo quando fromMe=true
-    // pra ajudar a investigar pq msg do celular/web nao esta sendo
-    // detectada como humano respondendo. Remover depois que estabilizar.
-    if (parsed.data.message?.fromMe === true) {
-      req.log.info(
-        {
-          fromMe: true,
-          msgId: parsed.data.message?.id ?? parsed.data.message?.messageid,
-          sender_pn: parsed.data.message?.sender_pn,
-          chatid: parsed.data.message?.chatid,
-          messageType: parsed.data.message?.messageType,
-          type: parsed.data.message?.type,
-          inbound: inbound
-            ? {
-                from: inbound.from,
-                fromMe: inbound.fromMe,
-                text: inbound.text?.slice(0, 80),
-                id: inbound.id,
-              }
-            : null,
-        },
-        'webhook DEBUG fromMe=true (humano respondeu pelo celular/web)',
-      );
-    }
-
     if (!inbound) {
       const mt = parsed.data.message?.messageType;
       const t = parsed.data.message?.type;

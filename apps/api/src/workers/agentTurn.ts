@@ -46,6 +46,34 @@ export function startAgentTurnWorker(logger: FastifyBaseLogger) {
       return;
     }
 
+    // SAFETY NET: mesmo se aiPausedUntil/status falharem por race condition
+    // ou versao antiga em prod, conferir se a ultima mensagem da conversa eh
+    // de role='human' E foi enviada nos ultimos AI_HUMAN_OVERRIDE_PAUSE_MS.
+    // Se sim, ainda eh "vez do humano" — pula. Protege contra IA respondendo
+    // por cima do atendente.
+    const lastHuman = await prisma.message.findFirst({
+      where: { conversationId, role: 'human' },
+      orderBy: { createdAt: 'desc' },
+      select: { createdAt: true },
+    });
+    if (lastHuman) {
+      const sinceHumanMs = Date.now() - lastHuman.createdAt.getTime();
+      // AI_HUMAN_OVERRIDE_PAUSE_MS importado via env (ja eh usado em outros
+      // lugares pra mesmo proposito). Default 2h.
+      const { env } = await import('../env.js');
+      if (sinceHumanMs < env.AI_HUMAN_OVERRIDE_PAUSE_MS) {
+        logger.info(
+          {
+            conversationId,
+            sinceHumanMin: Math.round(sinceHumanMs / 60_000),
+            cooldownMin: Math.round(env.AI_HUMAN_OVERRIDE_PAUSE_MS / 60_000),
+          },
+          'agent_turn: humano respondeu recentemente, IA aguarda cooldown',
+        );
+        return;
+      }
+    }
+
     // A IA continua respondendo mesmo fora do horario comercial — ela
     // sabe pelo system prompt informar a previsao de retorno da equipe
     // pra agendamentos. Ver agent.ts (busca tenant.config.businessHours).

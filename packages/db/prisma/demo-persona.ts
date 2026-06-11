@@ -141,8 +141,11 @@ Quando o paciente perguntar sobre HPV (preço, indicação, "tem HPV?", etc), us
 > A vacina HPV Nonavalente é a forma mais completa de proteção contra o HPV, cobrindo 9 tipos do vírus.
 >
 > Ela auxilia na prevenção do câncer de colo do útero, além de outros tipos de câncer relacionados ao HPV (vulva, vagina, ânus, pênis e orofaringe). Também protege contra a maioria dos casos de verrugas genitais.
->
-> Indicada principalmente para adolescentes, mas pode ser aplicada em adultos.
+
+### ⚠️ Adapte a última frase à idade do paciente
+
+- **Paciente é criança/adolescente até 19 anos** (ou pergunta pra um filho/filha nessa faixa): use **"Indicada principalmente para adolescentes, faixa ideal pra aplicar."**
+- **Paciente é adulto (20+)** (ou pra outra pessoa adulta): use **"Adultos também podem fazer — segue oferecendo proteção contra os tipos do vírus que a pessoa ainda não teve contato."** NÃO diga "indicada principalmente para adolescentes" quando o paciente já é adulto — fica parecendo que tá dizendo que a vacina não é pra ele.
 
 Depois do trecho, apresente o preço no formato canônico (à vista + 3x).
 

@@ -18,7 +18,7 @@ export function startAgentTurnWorker(logger: FastifyBaseLogger) {
     // Re-checa status: atendente pode ter assumido durante o buffer
     const conv = await prisma.conversation.findUnique({
       where: { id: conversationId },
-      select: { status: true, aiPausedUntil: true },
+      select: { status: true, aiPausedUntil: true, metadata: true },
     });
     if (!conv) {
       logger.warn({ conversationId }, 'agent_turn: conversation not found');
@@ -46,32 +46,34 @@ export function startAgentTurnWorker(logger: FastifyBaseLogger) {
       return;
     }
 
-    // SAFETY NET: mesmo se aiPausedUntil/status falharem por race condition
-    // ou versao antiga em prod, conferir se a ultima mensagem da conversa eh
-    // de role='human' E foi enviada nos ultimos AI_HUMAN_OVERRIDE_PAUSE_MS.
-    // Se sim, ainda eh "vez do humano" — pula. Protege contra IA respondendo
-    // por cima do atendente.
-    const lastHuman = await prisma.message.findFirst({
-      where: { conversationId, role: 'human' },
-      orderBy: { createdAt: 'desc' },
-      select: { createdAt: true },
+    // SAFETY NET: regra operacional da clinica — se em algum momento um
+    // humano respondeu nesta conversa, a IA NAO assume mais. So volta
+    // depois que alguem clicar "Devolver para IA" (POST /resume-ai), que
+    // zera aiPausedUntil + grava aiResumedAt no metadata.
+    //
+    // Funciona como rede de seguranca contra qualquer falha das outras
+    // camadas (status, aiPausedUntil) — checagem direta no banco do que
+    // ja foi enviado.
+    //
+    // Filtragem por aiResumedAt: ignora msgs human ANTERIORES ao resume.
+    // Se o atendente assumiu, devolveu pra IA, e depois NAO falou de
+    // novo — a IA volta a operar normal.
+    const meta = (conv.metadata as Record<string, unknown> | null) ?? {};
+    const aiResumedAt =
+      typeof meta.aiResumedAt === 'string' ? new Date(meta.aiResumedAt) : null;
+    const humanFilter = aiResumedAt
+      ? { conversationId, role: 'human' as const, createdAt: { gt: aiResumedAt } }
+      : { conversationId, role: 'human' as const };
+    const hasHumanMsg = await prisma.message.findFirst({
+      where: humanFilter,
+      select: { id: true, createdAt: true },
     });
-    if (lastHuman) {
-      const sinceHumanMs = Date.now() - lastHuman.createdAt.getTime();
-      // AI_HUMAN_OVERRIDE_PAUSE_MS importado via env (ja eh usado em outros
-      // lugares pra mesmo proposito). Default 2h.
-      const { env } = await import('../env.js');
-      if (sinceHumanMs < env.AI_HUMAN_OVERRIDE_PAUSE_MS) {
-        logger.info(
-          {
-            conversationId,
-            sinceHumanMin: Math.round(sinceHumanMs / 60_000),
-            cooldownMin: Math.round(env.AI_HUMAN_OVERRIDE_PAUSE_MS / 60_000),
-          },
-          'agent_turn: humano respondeu recentemente, IA aguarda cooldown',
-        );
-        return;
-      }
+    if (hasHumanMsg) {
+      logger.info(
+        { conversationId, humanMsgAt: hasHumanMsg.createdAt.toISOString() },
+        'agent_turn: humano ja interveio nesta conversa, IA bloqueada (Devolver para IA pra reativar)',
+      );
+      return;
     }
 
     // A IA continua respondendo mesmo fora do horario comercial — ela

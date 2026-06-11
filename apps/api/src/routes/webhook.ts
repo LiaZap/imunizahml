@@ -95,7 +95,10 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
         patientId: patient.id,
       });
 
-      const pauseUntil = new Date(Date.now() + env.AI_HUMAN_OVERRIDE_PAUSE_MS);
+      // Pausa PERMANENTE — humano respondeu pelo celular, IA so volta se
+      // alguem clicar "Devolver para IA" no dashboard. Mesma decisao
+      // operacional aplicada quando humano responde pelo dashboard.
+      const pauseUntil = new Date('2099-12-31T23:59:59Z');
 
       await prisma.conversation.update({
         where: { id: conversation.id },

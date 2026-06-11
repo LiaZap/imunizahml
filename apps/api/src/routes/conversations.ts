@@ -1,11 +1,16 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { prisma, ConversationStatus } from '@imuniza/db';
+import { prisma, ConversationStatus, Prisma } from '@imuniza/db';
 import { addMessage } from '../services/conversation.js';
 import { uazapi } from '../services/uazapi.js';
 import { eventBus } from '../events/bus.js';
 import { agentTurnQueue, agentTurnJobId } from '../queue/queues.js';
 import { env } from '../env.js';
+
+// Pause "indefinido" pra IA quando humano assume — so o botao "Devolver
+// para IA" zera. Usamos data far-future em vez de booleano pra reutilizar
+// toda a logica existente de `aiPausedUntil > now`.
+const HUMAN_OVERRIDE_PAUSE_INDEFINITE = new Date('2099-12-31T23:59:59Z');
 
 const listQuery = z.object({
   status: z.enum(['active', 'awaiting_handoff', 'assigned', 'closed']).optional(),
@@ -107,12 +112,14 @@ export async function conversationsRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(409).send({ error: 'conversation_closed' });
     }
 
-    // PAUSE da IA: mesmo comportamento do webhook quando o humano responde
-    // pelo WhatsApp do celular. Garante consistencia entre os 2 caminhos.
-    // - Seta aiPausedUntil = agora + AI_HUMAN_OVERRIDE_PAUSE_MS (default 2h)
-    // - Cancela qualquer agent_turn pendente na fila (evita IA responder
-    //   logo depois do atendente, sobrepondo a resposta humana)
-    const pauseUntil = new Date(Date.now() + env.AI_HUMAN_OVERRIDE_PAUSE_MS);
+    // PAUSE da IA: PERMANENTE quando humano responde, ate alguem clicar
+    // "Devolver para IA". Decisao da dona da clinica — quando elas falam,
+    // a IA NAO pode mais responder nessa conversa.
+    //
+    // Implementacao: aiPausedUntil = data far-future (2099). Todas as
+    // checagens fazem `pausedUntil > now`, entao fica indefinido.
+    // O botao "Devolver para IA" zera esse campo (POST /resume-ai).
+    const pauseUntil = HUMAN_OVERRIDE_PAUSE_INDEFINITE;
 
     // Auto-assign if still in queue and userId provided (atendente começa a responder direto)
     if (conversation.status !== 'assigned' && userId) {
@@ -190,10 +197,16 @@ export async function conversationsRoutes(app: FastifyInstance): Promise<void> {
       return reply.send({ id, aiPausedUntil: null, status: conversation.status });
     }
 
+    // Marca timestamp de quando o atendente devolveu pra IA. O safety net
+    // do agent_turn ignora msgs human ANTERIORES a este timestamp — assim
+    // o historico nao bloqueia mais a IA. Apenas msgs human FUTURAS
+    // (que ainda nao ocorreram) bloqueariam.
+    const prevMeta = (conversation.metadata as Record<string, unknown> | null) ?? {};
     const updated = await prisma.conversation.update({
       where: { id },
       data: {
         aiPausedUntil: null,
+        metadata: { ...prevMeta, aiResumedAt: new Date().toISOString() } as Prisma.InputJsonValue,
         // Se estiver atribuida ou em handoff, volta a IA pro fluxo
         ...(wasAssigned ? { status: 'active', assignedToUserId: null } : {}),
       },

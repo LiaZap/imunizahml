@@ -236,6 +236,43 @@ export async function conversationsRoutes(app: FastifyInstance): Promise<void> {
       pausedUntil: '',
     });
 
+    // Dispara o agent_turn pra IA processar IMEDIATAMENTE as ultimas
+    // mensagens pendentes do paciente. Sem isso a IA so responderia
+    // quando o paciente mandasse algo NOVO — o que pode demorar.
+    //
+    // Le os ultimos dados necessarios pra montar o job. Se nao houver
+    // msg pendente do paciente, o agent_turn vai checar e nao fazer
+    // nada (loadHistory traz tudo, mas se a ultima eh assistant, o
+    // modelo geralmente nao responde sozinho).
+    try {
+      const fullConv = await prisma.conversation.findUnique({
+        where: { id },
+        select: {
+          tenantId: true,
+          patientId: true,
+          patient: { select: { phone: true } },
+        },
+      });
+      if (fullConv?.patient?.phone) {
+        const jobId = agentTurnJobId(id);
+        const pending = await agentTurnQueue.getJob(jobId).catch(() => null);
+        if (pending) await pending.remove().catch(() => undefined);
+        await agentTurnQueue.add(
+          'agent_turn',
+          {
+            tenantId: fullConv.tenantId,
+            conversationId: id,
+            patientId: fullConv.patientId,
+            patientPhone: fullConv.patient.phone,
+          },
+          { jobId, delay: 500 }, // delay curto pra evitar race com o update do banco
+        );
+        req.log.info({ conversationId: id }, 'resume-ai: agent_turn enfileirado');
+      }
+    } catch (err) {
+      req.log.error({ err }, 'resume-ai: falha ao enfileirar agent_turn');
+    }
+
     return { id: updated.id, aiPausedUntil: updated.aiPausedUntil, status: updated.status };
   });
 

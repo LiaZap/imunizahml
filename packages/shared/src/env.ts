@@ -7,7 +7,7 @@ const envSchema = z.object({
   REDIS_URL: z.string().url(),
 
   OPENAI_API_KEY: z.string().min(1),
-  OPENAI_CHAT_MODEL: z.string().default('gpt-4o'),
+  OPENAI_CHAT_MODEL: z.string().default('gpt-4.1'),
   OPENAI_EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
 
   UAZAPI_URL: z.string().url(),

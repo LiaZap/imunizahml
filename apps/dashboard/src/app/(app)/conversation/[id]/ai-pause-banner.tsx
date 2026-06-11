@@ -26,6 +26,15 @@ function remainingLabel(iso: string): string {
   return m === 0 ? `${h}h restantes` : `${h}h ${m}min restantes`;
 }
 
+/**
+ * Considera "indefinido" qualquer data sentinela far-future (>= ano 2090).
+ * O backend usa 2099-12-31 pra sinalizar que a pausa só sai com botão.
+ */
+function isIndefinite(iso: string): boolean {
+  const d = new Date(iso);
+  return d.getFullYear() >= 2090;
+}
+
 export function AiPauseBanner({
   conversationId,
   pausedUntil,
@@ -80,9 +89,18 @@ export function AiPauseBanner({
           IA pausada
         </div>
         <p className="text-sm leading-relaxed text-violet-900">
-          Um humano respondeu pelo WhatsApp da clínica. A IA volta a responder automaticamente{' '}
-          <b>{formatUntil(pausedUntil)}</b>{' '}
-          <span className="text-violet-700">({remainingLabel(pausedUntil)})</span>.
+          {isIndefinite(pausedUntil) ? (
+            <>
+              Um humano respondeu nesta conversa. A IA só volta a responder quando alguém clicar em{' '}
+              <b>Devolver para IA</b>.
+            </>
+          ) : (
+            <>
+              Um humano respondeu pelo WhatsApp da clínica. A IA volta a responder automaticamente{' '}
+              <b>{formatUntil(pausedUntil)}</b>{' '}
+              <span className="text-violet-700">({remainingLabel(pausedUntil)})</span>.
+            </>
+          )}
         </p>
         {error && <p className="mt-1 text-xs text-red-700">{error}</p>}
       </div>
@@ -93,7 +111,7 @@ export function AiPauseBanner({
           className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-violet-300 bg-white px-3 py-1.5 text-xs font-semibold text-violet-800 shadow-sm hover:bg-violet-100 disabled:opacity-50"
         >
           {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
-          Retomar IA agora
+          Devolver para IA
         </button>
       )}
     </div>

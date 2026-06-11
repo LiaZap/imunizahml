@@ -132,7 +132,7 @@ export async function publicCalendarRoutes(app: FastifyInstance): Promise<void> 
       const now = toIcsDate(new Date());
       const events = appointments.map((a) => {
         const start = new Date(a.scheduledFor);
-        const end = new Date(start.getTime() + 30 * 60_000); // 30 min default
+        const end = new Date(start.getTime() + 15 * 60_000); // 15 min — padrao operacional da clinica
         const patientName = a.patient.name?.trim() || a.patient.phone;
         const vaccines =
           a.vaccineSlugs.length > 0

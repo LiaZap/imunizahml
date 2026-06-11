@@ -4,6 +4,8 @@ import { prisma, ConversationStatus } from '@imuniza/db';
 import { addMessage } from '../services/conversation.js';
 import { uazapi } from '../services/uazapi.js';
 import { eventBus } from '../events/bus.js';
+import { agentTurnQueue, agentTurnJobId } from '../queue/queues.js';
+import { env } from '../env.js';
 
 const listQuery = z.object({
   status: z.enum(['active', 'awaiting_handoff', 'assigned', 'closed']).optional(),
@@ -105,11 +107,18 @@ export async function conversationsRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(409).send({ error: 'conversation_closed' });
     }
 
+    // PAUSE da IA: mesmo comportamento do webhook quando o humano responde
+    // pelo WhatsApp do celular. Garante consistencia entre os 2 caminhos.
+    // - Seta aiPausedUntil = agora + AI_HUMAN_OVERRIDE_PAUSE_MS (default 2h)
+    // - Cancela qualquer agent_turn pendente na fila (evita IA responder
+    //   logo depois do atendente, sobrepondo a resposta humana)
+    const pauseUntil = new Date(Date.now() + env.AI_HUMAN_OVERRIDE_PAUSE_MS);
+
     // Auto-assign if still in queue and userId provided (atendente começa a responder direto)
     if (conversation.status !== 'assigned' && userId) {
       await prisma.conversation.update({
         where: { id },
-        data: { status: 'assigned', assignedToUserId: userId },
+        data: { status: 'assigned', assignedToUserId: userId, aiPausedUntil: pauseUntil },
       });
       await prisma.handoff.updateMany({
         where: { conversationId: id, status: 'pending' },
@@ -121,7 +130,30 @@ export async function conversationsRoutes(app: FastifyInstance): Promise<void> {
         conversationId: id,
         userId,
       });
+    } else {
+      // Mesmo sem userId, ainda assim pausa a IA — mensagem do atendente foi
+      // enviada e não queremos que a IA mande outra resposta logo depois.
+      await prisma.conversation.update({
+        where: { id },
+        data: { aiPausedUntil: pauseUntil },
+      });
     }
+
+    // Cancela qualquer agent_turn pendente na fila pra evitar resposta
+    // "fantasma" da IA depois da mensagem humana.
+    try {
+      const pending = await agentTurnQueue.getJob(agentTurnJobId(id));
+      if (pending) await pending.remove().catch(() => undefined);
+    } catch {
+      /* ignore */
+    }
+
+    eventBus.emitDomain({
+      type: 'conversation.ai_paused',
+      tenantId: conversation.tenantId,
+      conversationId: id,
+      pausedUntil: pauseUntil.toISOString(),
+    });
 
     let sentMessageId = '';
     try {

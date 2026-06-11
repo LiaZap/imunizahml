@@ -144,7 +144,9 @@ export async function upsertEvent(input: {
 
   const calendar = buildCalendarClient(cfg.refreshToken);
   const start = new Date(input.appointment.scheduledFor);
-  const end = new Date(start.getTime() + 30 * 60_000);
+  // Duracao padrao do bloco de aplicacao = 15 min (padrao operacional
+  // da clinica, decisao da dona — agendamentos sao de 15 em 15).
+  const end = new Date(start.getTime() + 15 * 60_000);
   const patientName = input.appointment.patient.name?.trim() || input.appointment.patient.phone;
   const vacc =
     input.appointment.vaccineSlugs.length > 0

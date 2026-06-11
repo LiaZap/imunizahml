@@ -58,6 +58,29 @@ export async function getOrCreateActiveConversation(params: {
 
   if (existing) return existing;
 
+  // Se a conversa foi FECHADA recentemente E o aiPausedUntil ainda vale
+  // (cooldown pos-fechamento), reabrir essa conversa em vez de criar nova.
+  // Assim a equipe nao precisa "fechar de novo" toda vez que o paciente
+  // mandar mensagem dentro do cooldown.
+  const recentlyClosed = await prisma.conversation.findFirst({
+    where: {
+      tenantId: params.tenantId,
+      patientId: params.patientId,
+      status: 'closed',
+      aiPausedUntil: { gt: new Date() }, // cooldown ainda ativo
+    },
+    orderBy: { lastMessageAt: 'desc' },
+  });
+  if (recentlyClosed) {
+    return prisma.conversation.update({
+      where: { id: recentlyClosed.id },
+      // Reabre como active mas mantem aiPausedUntil — IA continua em silencio
+      // ate o cooldown expirar. Se a equipe quiser intervir, responde via
+      // dashboard normalmente.
+      data: { status: 'active' },
+    });
+  }
+
   return prisma.conversation.create({
     data: {
       tenantId: params.tenantId,

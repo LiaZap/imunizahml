@@ -31,6 +31,13 @@ export function startAgentTurnWorker(logger: FastifyBaseLogger) {
       );
       return;
     }
+    if (conv.status === 'closed') {
+      logger.info(
+        { conversationId },
+        'agent_turn: conversa fechada, IA nao responde',
+      );
+      return;
+    }
     if (conv.aiPausedUntil && conv.aiPausedUntil.getTime() > Date.now()) {
       logger.info(
         { conversationId, until: conv.aiPausedUntil.toISOString() },

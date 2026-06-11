@@ -232,10 +232,16 @@ export async function conversationsRoutes(app: FastifyInstance): Promise<void> {
     if (!conversation) return reply.code(404).send({ error: 'not_found' });
     if (conversation.status === 'closed') return reply.send(conversation);
 
+    // Pausa a IA enquanto a conversa estiver fechada — se o paciente mandar
+    // mensagem nova ANTES desse tempo expirar, vira nova conversa mas a IA
+    // ainda fica em silencio (cooldown pos-fechamento) pra equipe poder
+    // decidir se reabre ou ignora. Default 24h.
+    const cooldownUntil = new Date(Date.now() + env.AI_HUMAN_OVERRIDE_PAUSE_MS);
+
     const updated = await prisma.$transaction(async (tx) => {
       const c = await tx.conversation.update({
         where: { id },
-        data: { status: ConversationStatus.closed },
+        data: { status: ConversationStatus.closed, aiPausedUntil: cooldownUntil },
       });
       await tx.handoff.updateMany({
         where: { conversationId: id, status: { in: ['pending', 'assigned'] } },
@@ -243,6 +249,15 @@ export async function conversationsRoutes(app: FastifyInstance): Promise<void> {
       });
       return c;
     });
+
+    // Cancela qualquer agent_turn pendente — IA nao vai mais responder esta
+    // conversa nem mesmo no proximo debounce
+    try {
+      const pending = await agentTurnQueue.getJob(agentTurnJobId(id));
+      if (pending) await pending.remove().catch(() => undefined);
+    } catch {
+      /* ignore */
+    }
 
     eventBus.emitDomain({
       type: 'conversation.closed',

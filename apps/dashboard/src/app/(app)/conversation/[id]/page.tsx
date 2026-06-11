@@ -86,7 +86,11 @@ export default async function ConversationPage({ params }: { params: Promise<{ i
         <AiPauseBanner
           conversationId={conversation.id}
           pausedUntil={conversation.aiPausedUntil ?? null}
-          canResume={user.role === 'admin' || user.role === 'attendant'}
+          canResume={
+            user.role === 'admin' ||
+            user.role === 'attendant' ||
+            user.role === 'secretary'
+          }
         />
 
         {conversation.handoffs?.[0]?.summary && (

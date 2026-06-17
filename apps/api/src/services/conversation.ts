@@ -72,22 +72,55 @@ export async function getOrCreateActiveConversation(params: {
     orderBy: { lastMessageAt: 'desc' },
   });
   if (recentlyClosed) {
-    return prisma.conversation.update({
-      where: { id: recentlyClosed.id },
-      // Reabre como active mas mantem aiPausedUntil — IA continua em silencio
-      // ate o cooldown expirar. Se a equipe quiser intervir, responde via
-      // dashboard normalmente.
-      data: { status: 'active' },
-    });
+    try {
+      return await prisma.conversation.update({
+        where: { id: recentlyClosed.id },
+        // Reabre como active mas mantem aiPausedUntil — IA continua em silencio
+        // ate o cooldown expirar. Se a equipe quiser intervir, responde via
+        // dashboard normalmente.
+        data: { status: 'active' },
+      });
+    } catch (err) {
+      // Race: outra request reabriu/criou em paralelo e o partial unique
+      // index (active/awaiting_handoff/assigned) por paciente bloqueou.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+        const fallback = await prisma.conversation.findFirst({
+          where: {
+            tenantId: params.tenantId,
+            patientId: params.patientId,
+            status: { in: ['active', 'awaiting_handoff', 'assigned'] },
+          },
+          orderBy: { lastMessageAt: 'desc' },
+        });
+        if (fallback) return fallback;
+      }
+      throw err;
+    }
   }
 
-  return prisma.conversation.create({
-    data: {
-      tenantId: params.tenantId,
-      patientId: params.patientId,
-      status: 'active',
-    },
-  });
+  try {
+    return await prisma.conversation.create({
+      data: {
+        tenantId: params.tenantId,
+        patientId: params.patientId,
+        status: 'active',
+      },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      // Outra request criou em paralelo. Refaz a busca da active.
+      const fallback = await prisma.conversation.findFirst({
+        where: {
+          tenantId: params.tenantId,
+          patientId: params.patientId,
+          status: { in: ['active', 'awaiting_handoff', 'assigned'] },
+        },
+        orderBy: { lastMessageAt: 'desc' },
+      });
+      if (fallback) return fallback;
+    }
+    throw err;
+  }
 }
 
 export async function addMessage(params: {

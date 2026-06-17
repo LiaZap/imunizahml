@@ -196,14 +196,10 @@ export async function runAgent(input: RunAgentInput): Promise<void> {
 
     const finalText = assistantMsg.content?.trim();
     if (finalText && alreadySentInThisTurn) {
-      // Modelo emitiu texto final apos ja ter chamado send_reply. Isso
-      // duplicaria a mensagem. So salva no historico sem enviar.
-      await addMessage({
-        conversationId: input.conversationId,
-        role: 'assistant',
-        content: finalText,
-        metadata: { duplicateOfPriorSendReply: true, notSent: true },
-      });
+      // Modelo emitiu texto final apos ja ter chamado send_reply. Os
+      // chunks ja foram salvos individualmente pelo sendHumanized, entao
+      // NAO salvamos o joined — ele aparecia como msg duplicada no chat
+      // do dashboard (WhatsApp recebia certo, dashboard mostrava 2x).
       input.logger.info(
         { finalTextLen: finalText.length },
         'agent fallback skipped — send_reply ja enviou neste turno',

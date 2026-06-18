@@ -3,6 +3,13 @@ import type { Job } from 'bullmq';
 import { prisma } from '@imuniza/db';
 import { registerAgentTurnWorker, type AgentTurnJob } from '../queue/queues.js';
 import { runAgent } from '../services/agent.js';
+import { isWithinBusinessHours, type BusinessHoursConfig } from '../services/businessHours.js';
+import { getTenantConfig } from '../services/tenant.js';
+import { env } from '../env.js';
+
+interface TenantBusinessHoursConfig {
+  businessHours?: BusinessHoursConfig;
+}
 
 /**
  * Processa o "turno" da IA apos o debounce de mensagens do paciente.
@@ -76,9 +83,26 @@ export function startAgentTurnWorker(logger: FastifyBaseLogger) {
       return;
     }
 
-    // A IA continua respondendo mesmo fora do horario comercial — ela
-    // sabe pelo system prompt informar a previsao de retorno da equipe
-    // pra agendamentos. Ver agent.ts (busca tenant.config.businessHours).
+    // Hard stop opcional: quando env.AI_HARD_STOP_OUTSIDE_BUSINESS_HOURS = true,
+    // a IA NAO responde fora do horario comercial. Decisao operacional pra
+    // pre-lancamento — a clinica nao quer respostas da IA depois das 18h
+    // enquanto ainda calibra a persona. Se quiser voltar a operar 24/7,
+    // basta tirar essa env (ou deixar false).
+    if (env.AI_HARD_STOP_OUTSIDE_BUSINESS_HOURS) {
+      const tenant = await getTenantConfig(tenantId);
+      const businessHours = (tenant.config as TenantBusinessHoursConfig | null)?.businessHours;
+      if (!isWithinBusinessHours(businessHours)) {
+        logger.info(
+          { conversationId, tenantId },
+          'agent_turn: fora do horario comercial e AI_HARD_STOP_OUTSIDE_BUSINESS_HOURS=true — IA em silencio',
+        );
+        return;
+      }
+    }
+
+    // Dentro do horario (ou hard stop desligado): IA responde normalmente.
+    // Mesmo fora do horario com hard stop OFF, o agent.ts ainda informa pelo
+    // system prompt a previsao de retorno da equipe pra agendamentos.
     await runAgent({
       tenantId,
       conversationId,

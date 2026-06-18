@@ -28,6 +28,16 @@ const envSchema = z.object({
     .max(24 * 60 * 60_000)
     .default(2 * 60 * 60_000),
 
+  /** Hard stop: quando true, a IA NAO responde fora do horario comercial
+   *  (definido em tenant.config.businessHours, default 08-18 America/Sao_Paulo).
+   *  Use no pre-lancamento pra ela so falar durante o expediente, evitando
+   *  acompanhamento dela 24/7 enquanto ajusta persona.
+   *  Default false (responde 24/7, so muda o tom pelo prompt). */
+  AI_HARD_STOP_OUTSIDE_BUSINESS_HOURS: z
+    .union([z.boolean(), z.enum(['true', 'false', '0', '1'])])
+    .default(false)
+    .transform((v) => v === true || v === 'true' || v === '1'),
+
   API_PORT: z.coerce.number().int().positive().default(3001),
   API_BASE_URL: z.string().url(),
   DASHBOARD_BASE_URL: z.string().url(),

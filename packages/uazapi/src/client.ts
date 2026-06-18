@@ -410,6 +410,12 @@ export class UazapiClient {
         sender_pn?: string;
         senderName?: string;
         fromMe?: boolean;
+        // Uazapi sinaliza assim quando a mensagem SAIU pela API (echo do nosso send).
+        // Diferente de fromMe puro, que tambem inclui msg digitada no celular da clinica.
+        // Snake_case ou camelCase, varia por versao — aceita ambos.
+        wasSentByApi?: boolean;
+        was_sent_by_api?: boolean;
+        sentByApi?: boolean;
         isGroup?: boolean;
         type?: string;
         messageType?: string;
@@ -563,6 +569,7 @@ export class UazapiClient {
       pushName: pushName || undefined,
       timestamp,
       fromMe,
+      sentByApi: msg.wasSentByApi === true || msg.was_sent_by_api === true || msg.sentByApi === true,
       media,
       raw: payload,
     };

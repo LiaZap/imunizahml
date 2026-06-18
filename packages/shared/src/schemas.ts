@@ -64,6 +64,11 @@ export const UazapiWebhookMessageSchema = z
         groupName: z.string().optional(),
         owner: z.string().optional(),
         fromMe: z.boolean().optional(),
+        // Uazapi expoe esse flag pra distinguir echo-de-api de mensagem do celular.
+        // Varia entre camelCase / snake_case por versao — aceitamos todos.
+        wasSentByApi: z.boolean().optional(),
+        was_sent_by_api: z.boolean().optional(),
+        sentByApi: z.boolean().optional(),
         isGroup: z.boolean().optional(),
         type: z.string().optional(), // text | image | audio | video | document | ...
         messageType: z.string().optional(), // Conversation | ExtendedTextMessage | AudioMessage | ImageMessage | ...

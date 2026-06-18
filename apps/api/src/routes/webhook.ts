@@ -68,7 +68,16 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
     //       salva como role='human', pausa a IA por 2h
     // ————————————————————————————————————————————————
     if (inbound.fromMe) {
-      // (a) echo: ja existe Message com esse uazapiMessageId?
+      // (a) echo da nossa API:
+      // 1) Flag direto da Uazapi `wasSentByApi=true` — caminho preferido.
+      //    Resolve race: o webhook chega ANTES do api persistir a Message
+      //    com o uazapiMessageId, entao dedup por ID falha. Confiar no flag
+      //    da Uazapi evita gravar role='human' por engano (que aparecia no
+      //    chat como "Atendente" duplicado e pausava a IA).
+      // 2) Fallback: dedup por uazapiMessageId (caso a Uazapi nao mande o flag).
+      if (inbound.sentByApi) {
+        return reply.code(202).send({ status: 'ignored', reason: 'self-echo:flag' });
+      }
       if (inbound.id) {
         const echoed = await prisma.message.findFirst({
           where: {
@@ -77,7 +86,7 @@ export async function webhookRoutes(app: FastifyInstance): Promise<void> {
           select: { id: true },
         });
         if (echoed) {
-          return reply.code(202).send({ status: 'ignored', reason: 'self-echo' });
+          return reply.code(202).send({ status: 'ignored', reason: 'self-echo:id' });
         }
       }
 

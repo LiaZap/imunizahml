@@ -76,6 +76,13 @@ export interface InboundMessage {
   timestamp: number;
   /** True quando a mensagem saiu do proprio numero da clinica (humano ou AI). */
   fromMe: boolean;
+  /**
+   * True quando a mensagem foi enviada pela API (echo do nosso send).
+   * False/undefined quando foi digitada no celular da clinica.
+   * Usado pra desambiguar fromMe sem depender do dedup por messageId
+   * (que tem race condition — webhook chega antes da Message ser salva).
+   */
+  sentByApi?: boolean;
   media?: {
     kind: InboundMediaKind;
     mimetype?: string;

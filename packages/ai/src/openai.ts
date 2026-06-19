@@ -9,10 +9,12 @@ export interface OpenAIConfig {
 export function createOpenAI(config: OpenAIConfig) {
   const client = new OpenAI({
     apiKey: config.apiKey,
-    // node-fetch@2.7.0 (usado em alguns runtimes) tem bug intermitente com
-    // gunzip de respostas chunked — gera ERR_STREAM_PREMATURE_CLOSE quando
-    // a OpenAI fecha conexao abruptamente. Aumentamos retries do SDK pra
-    // 5 (default 2) pra cobrir esses casos antes do job ser marcado failed.
+    // CRITICO: forca o SDK a usar o fetch NATIVO do Node 18+ em vez do
+    // node-fetch@2.7.0 (default em alguns ambientes). O node-fetch tem bug
+    // recorrente com gunzip de respostas chunked da OpenAI gerando
+    // ERR_STREAM_PREMATURE_CLOSE. Confirmado em prod: chamada direta com
+    // fetch nativo retorna 200, mas via SDK falhava direto.
+    fetch: globalThis.fetch,
     maxRetries: 5,
     // Default sao 600s; 90s e suficiente pra um turno do agent e libera
     // o worker pra retentar mais cedo se a conexao travar.

@@ -14,6 +14,9 @@ const configBody = z
     .object({
       start: z.string(),
       end: z.string(),
+      saturdayStart: z.string().optional(),
+      saturdayEnd: z.string().optional(),
+      saturdayClosed: z.boolean().optional(),
       timezone: z.string(),
     })
     .optional(),

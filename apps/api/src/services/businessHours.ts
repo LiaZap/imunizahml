@@ -12,8 +12,14 @@ export interface SilentHoursConfig {
 }
 
 export interface BusinessHoursConfig {
-  start?: string; // HH:mm
-  end?: string; // HH:mm
+  start?: string; // HH:mm — seg a sex (e sabado se saturdayStart vazio)
+  end?: string; // HH:mm — seg a sex
+  /** Hora de abertura no sabado (default: usa `start`). Ex.: 09:00 */
+  saturdayStart?: string;
+  /** Hora de fechamento no sabado (default: 12:00). */
+  saturdayEnd?: string;
+  /** Quando true, clinica nao atende sabado. */
+  saturdayClosed?: boolean;
   timezone?: string; // ex: 'America/Sao_Paulo'
 }
 
@@ -71,8 +77,18 @@ export function isWithinBusinessHours(
   const tz = business?.timezone ?? DEFAULT_TZ;
   const { hour, minute, weekday } = partsInTz(options.now ?? new Date(), tz);
   if (weekday === 0) return false; // domingo
-  const startStr = business?.start ?? '08:00';
-  const endStr = weekday === 6 ? options.saturdayEnd ?? '12:00' : business?.end ?? '18:00';
+  if (weekday === 6 && business?.saturdayClosed) return false;
+  // Sabado tem horario proprio (saturdayStart/saturdayEnd). Se vazios,
+  // herda do start/end. options.saturdayEnd ainda funciona como fallback
+  // legado pra callers antigos que passavam direto.
+  const startStr =
+    weekday === 6
+      ? business?.saturdayStart ?? business?.start ?? '08:00'
+      : business?.start ?? '08:00';
+  const endStr =
+    weekday === 6
+      ? business?.saturdayEnd ?? options.saturdayEnd ?? '12:00'
+      : business?.end ?? '18:00';
   const [sh = 0, sm = 0] = startStr.split(':').map(Number);
   const [eh = 0, em = 0] = endStr.split(':').map(Number);
   const minutesNow = hour * 60 + minute;
@@ -86,14 +102,19 @@ export function nextBusinessOpeningLabel(
 ): string {
   const tz = business?.timezone ?? DEFAULT_TZ;
   const { weekday, hour, minute } = partsInTz(options.now ?? new Date(), tz);
-  const startStr = business?.start ?? '08:00';
-  const [sh = 8] = startStr.split(':').map(Number);
+  const weekStart = business?.start ?? '08:00';
+  const satStart = business?.saturdayStart ?? weekStart;
+  const startFor = (d: number): string => (d === 6 ? satStart : weekStart);
 
   // Mesmo dia, antes do horário?
   if (weekday >= 1 && weekday <= 5) {
-    if (hour * 60 + minute < sh * 60) return `hoje às ${startStr}`;
+    const [sh = 8] = weekStart.split(':').map(Number);
+    if (hour * 60 + minute < sh * 60) return `hoje às ${weekStart}`;
   }
-  if (weekday === 6 && hour * 60 + minute < sh * 60) return `hoje às ${startStr}`;
+  if (weekday === 6 && !business?.saturdayClosed) {
+    const [sh = 8] = satStart.split(':').map(Number);
+    if (hour * 60 + minute < sh * 60) return `hoje às ${satStart}`;
+  }
 
   // Próximos dias
   const dayLabels = [
@@ -107,12 +128,13 @@ export function nextBusinessOpeningLabel(
   ];
   for (let offset = 1; offset <= 7; offset++) {
     const next = (weekday + offset) % 7;
-    if (next >= 1 && next <= 6) {
-      if (offset === 1) return `amanhã (${dayLabels[next]}) às ${startStr}`;
-      return `${dayLabels[next]} às ${startStr}`;
-    }
+    if (next === 0) continue; // domingo
+    if (next === 6 && business?.saturdayClosed) continue;
+    const open = startFor(next);
+    if (offset === 1) return `amanhã (${dayLabels[next]}) às ${open}`;
+    return `${dayLabels[next]} às ${open}`;
   }
-  return `próxima segunda às ${startStr}`;
+  return `próxima segunda às ${weekStart}`;
 }
 
 /** Mensagem padrao quando o tenant nao configurou offlineMessage. */

@@ -30,6 +30,13 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
   const [phone, setPhone] = useState(initial.phone ?? '');
   const [hoursStart, setHoursStart] = useState(initial.config.businessHours?.start ?? '08:00');
   const [hoursEnd, setHoursEnd] = useState(initial.config.businessHours?.end ?? '18:00');
+  const [satStart, setSatStart] = useState(
+    initial.config.businessHours?.saturdayStart ?? '09:00',
+  );
+  const [satEnd, setSatEnd] = useState(initial.config.businessHours?.saturdayEnd ?? '12:00');
+  const [satClosed, setSatClosed] = useState(
+    initial.config.businessHours?.saturdayClosed ?? false,
+  );
   const [timezone, setTimezone] = useState(
     initial.config.businessHours?.timezone ?? 'America/Sao_Paulo',
   );
@@ -273,7 +280,14 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
           // prisma/demo-persona.ts). Backend tambem rejeita esse campo.
           greeting,
           phone: phone || undefined,
-          businessHours: { start: hoursStart, end: hoursEnd, timezone },
+          businessHours: {
+            start: hoursStart,
+            end: hoursEnd,
+            saturdayStart: satStart,
+            saturdayEnd: satEnd,
+            saturdayClosed: satClosed,
+            timezone,
+          },
           silentHours: { enabled: silentEnabled, start: silentStart, end: silentEnd },
           quickTemplates: templates.filter((t) => t.label.trim() && t.text.trim()),
           reminders: {
@@ -360,30 +374,72 @@ export function SettingsForm({ initial }: { initial: TenantSettings }) {
         title="Horário de atendimento"
         description="A IA menciona esses horários quando relevante."
       >
-        <div className="grid grid-cols-3 gap-3">
-          <Field label="Abertura">
-            <input
-              type="time"
-              value={hoursStart}
-              onChange={(e) => setHoursStart(e.target.value)}
-              className="input"
-            />
-          </Field>
-          <Field label="Fechamento">
-            <input
-              type="time"
-              value={hoursEnd}
-              onChange={(e) => setHoursEnd(e.target.value)}
-              className="input"
-            />
-          </Field>
-          <Field label="Timezone">
-            <input
-              value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
-              className="input"
-            />
-          </Field>
+        <div className="space-y-3">
+          <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+            Segunda a sexta
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Abertura">
+              <input
+                type="time"
+                value={hoursStart}
+                onChange={(e) => setHoursStart(e.target.value)}
+                className="input"
+              />
+            </Field>
+            <Field label="Fechamento">
+              <input
+                type="time"
+                value={hoursEnd}
+                onChange={(e) => setHoursEnd(e.target.value)}
+                className="input"
+              />
+            </Field>
+            <Field label="Timezone">
+              <input
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                className="input"
+              />
+            </Field>
+          </div>
+
+          <div className="border-t border-slate-200 pt-3">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                Sábado
+              </div>
+              <label className="flex items-center gap-2 text-xs text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={satClosed}
+                  onChange={(e) => setSatClosed(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-brand focus:ring-brand"
+                />
+                Fechado aos sábados
+              </label>
+            </div>
+            {!satClosed && (
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Abertura sábado">
+                  <input
+                    type="time"
+                    value={satStart}
+                    onChange={(e) => setSatStart(e.target.value)}
+                    className="input"
+                  />
+                </Field>
+                <Field label="Fechamento sábado">
+                  <input
+                    type="time"
+                    value={satEnd}
+                    onChange={(e) => setSatEnd(e.target.value)}
+                    className="input"
+                  />
+                </Field>
+              </div>
+            )}
+          </div>
         </div>
       </Section>
 

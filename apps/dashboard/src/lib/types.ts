@@ -104,7 +104,14 @@ export interface TenantSettings {
   config: {
     persona?: string;
     greeting?: string;
-    businessHours?: { start: string; end: string; timezone: string };
+    businessHours?: {
+      start: string;
+      end: string;
+      saturdayStart?: string;
+      saturdayEnd?: string;
+      saturdayClosed?: boolean;
+      timezone: string;
+    };
     silentHours?: { enabled: boolean; start: string; end: string; offlineMessage?: string };
     quickTemplates?: Array<{ label: string; text: string }>;
     reminders?: {

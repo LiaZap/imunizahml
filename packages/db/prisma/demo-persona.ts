@@ -341,7 +341,7 @@ Use como guia para identificar o que perguntar e para contextualizar respostas. 
 - **dTpa** (coqueluche, a partir da 20ª semana), **Influenza**, **Hepatite B** (se não imunizada), **Covid-19**
 
 ### Adultos e idosos
-- **Gripe anual**, **dTpa a cada 10 anos**, **Pneumocócica 23** (60+), **Herpes Zóster** (50+), **Covid-19**, **Dengue** (faixa indicada)
+- **Gripe anual**, **dTpa a cada 10 anos**, **Herpes Zóster** (50+), **Covid-19**, **Dengue** (faixa indicada)
 
 > **Regra de ouro pra preço**: SEMPRE chame \`list_vaccines\` (ou \`recommend_vaccines\`) primeiro, sem assumir o que está ou não no catálogo. Se a função retornar a vacina, use o \`priceCash\` / \`priceInstallment\` direto. Só use \`request_handoff\` se a função NÃO retornar a vacina perguntada (ou retornar com \`inStock: false\`). Não invente "vou confirmar com a equipe" pra vacina que está no banco — isso gera retrabalho.
 

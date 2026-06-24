@@ -25,11 +25,25 @@ function fillTemplate(
     .replace(/\{VACINA\}/g, vars.vaccine);
 }
 
-function formatDate(d: Date): string {
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+// IMPORTANTE: o servidor roda em UTC. Sem `timeZone`, toLocaleDateString/Time
+// retorna o horario UTC, nao o horario local da clinica. Causou bug em prod
+// onde lembrete de agendamento as 11:45 BRT saia como 14:45 (UTC).
+const DEFAULT_TZ = 'America/Sao_Paulo';
+
+function formatDate(d: Date, tz: string = DEFAULT_TZ): string {
+  return d.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: tz,
+  });
 }
-function formatTime(d: Date): string {
-  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+function formatTime(d: Date, tz: string = DEFAULT_TZ): string {
+  return d.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: tz,
+  });
 }
 
 /**
@@ -64,7 +78,12 @@ export async function scheduleAppointmentReminders(appointmentId: string): Promi
     return 0;
   }
 
-  const config = (appt.tenant.config as { reminders?: ReminderConfig } | null)?.reminders ?? {};
+  const tenantConfig = (appt.tenant.config ?? {}) as {
+    reminders?: ReminderConfig;
+    businessHours?: { timezone?: string };
+  };
+  const config = tenantConfig.reminders ?? {};
+  const tz = tenantConfig.businessHours?.timezone || DEFAULT_TZ;
   if (config.enabled === false) return 0;
   const leadTimes = (config.leadTimesMinutes ?? [24 * 60, 60]).filter(
     (n) => Number.isFinite(n) && n >= 5,
@@ -92,8 +111,8 @@ export async function scheduleAppointmentReminders(appointmentId: string): Promi
   const template = config.messageTemplate?.trim() || DEFAULT_TEMPLATE;
   const message = fillTemplate(template, {
     name: appt.patient.name?.split(' ')[0] ?? 'tudo bem',
-    date: formatDate(apptDate),
-    time: formatTime(apptDate),
+    date: formatDate(apptDate, tz),
+    time: formatTime(apptDate, tz),
     vaccine: vaccineLabel,
   });
 

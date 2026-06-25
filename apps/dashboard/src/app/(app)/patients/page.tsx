@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Phone, Syringe, UserRound } from 'lucide-react';
+import { CalendarCheck, Phone, Syringe, UserRound } from 'lucide-react';
 import { apiGet } from '@/lib/api-server';
 import type { PatientSummary } from '@/lib/types';
 import { PatientsSearch } from './search';
@@ -96,6 +96,11 @@ export default async function PatientsPage({ searchParams }: PageProps) {
                   <span className="inline-flex items-center gap-1">
                     <Syringe className="h-3 w-3 text-brand" />
                     <strong className="text-slate-700">{p._count?.vaccinations ?? 0}</strong> vacinas
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <CalendarCheck className="h-3 w-3 text-violet-600" />
+                    <strong className="text-slate-700">{p._count?.appointments ?? 0}</strong>{' '}
+                    agend
                   </span>
                   <span>
                     <strong className="text-slate-700">{p._count?.conversations ?? 0}</strong> conversas

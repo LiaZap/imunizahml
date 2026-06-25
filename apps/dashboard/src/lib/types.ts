@@ -129,7 +129,7 @@ export interface PatientSummary {
   profile: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
-  _count?: { conversations: number; vaccinations: number };
+  _count?: { conversations: number; vaccinations: number; appointments: number };
 }
 
 export interface PatientVaccination {

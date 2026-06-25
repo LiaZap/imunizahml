@@ -49,7 +49,16 @@ export async function patientsRoutes(app: FastifyInstance): Promise<void> {
       orderBy: { updatedAt: 'desc' },
       take: q.limit,
       include: {
-        _count: { select: { conversations: true, vaccinations: true } },
+        _count: {
+          select: {
+            conversations: true,
+            vaccinations: true,
+            // Inclui contagem total de agendamentos. A UI mostra esse
+            // numero no card pra equipe ver "quem tem coisa marcada"
+            // ja na listagem, sem precisar abrir cada paciente.
+            appointments: true,
+          },
+        },
       },
     });
   });

@@ -241,6 +241,154 @@ export const functionHandlers: Record<
     };
   },
 
+  async register_appointment(args, ctx) {
+    const scheduledForStr = String(args.scheduledFor ?? '').trim();
+    const vaccineSlugs = Array.isArray(args.vaccineSlugs)
+      ? (args.vaccineSlugs as unknown[]).map((s) => String(s)).filter((s) => s.length > 0)
+      : [];
+    const expectedValueRaw = args.expectedValue;
+    const notes = typeof args.notes === 'string' ? args.notes.trim() : undefined;
+
+    if (!scheduledForStr) {
+      return {
+        name: 'register_appointment',
+        output: JSON.stringify({ ok: false, error: 'scheduledFor obrigatorio' }),
+      };
+    }
+    const when = new Date(scheduledForStr);
+    if (Number.isNaN(when.getTime())) {
+      return {
+        name: 'register_appointment',
+        output: JSON.stringify({
+          ok: false,
+          error: 'scheduledFor invalido — use ISO 8601 com timezone -03:00',
+        }),
+      };
+    }
+    if (when.getTime() <= Date.now()) {
+      return {
+        name: 'register_appointment',
+        output: JSON.stringify({
+          ok: false,
+          error: 'scheduledFor tem que ser no futuro',
+        }),
+      };
+    }
+    if (vaccineSlugs.length === 0) {
+      return {
+        name: 'register_appointment',
+        output: JSON.stringify({ ok: false, error: 'vaccineSlugs vazio' }),
+      };
+    }
+
+    // Gate: paciente tem nome (mesma regra do request_handoff)
+    const patient = await prisma.patient.findUnique({
+      where: { id: ctx.patientId },
+      select: { name: true, profile: true },
+    });
+    const profileName = ((patient?.profile as Record<string, unknown> | null) ?? {}).name;
+    const hasName =
+      (typeof patient?.name === 'string' && patient.name.trim().length > 0) ||
+      (typeof profileName === 'string' && profileName.trim().length > 0);
+    if (!hasName) {
+      return {
+        name: 'register_appointment',
+        output: JSON.stringify({
+          ok: false,
+          error: 'patient_name_required',
+          message:
+            'Pergunte o nome do paciente e registre com update_patient_profile({ name }) antes de agendar.',
+        }),
+      };
+    }
+
+    // Valida slugs contra o banco (pega apenas active + tenantId)
+    const knownVaccines = await prisma.vaccine.findMany({
+      where: { tenantId: ctx.tenantId, active: true, slug: { in: vaccineSlugs } },
+      select: { slug: true, priceCash: true, name: true },
+    });
+    if (knownVaccines.length === 0) {
+      return {
+        name: 'register_appointment',
+        output: JSON.stringify({
+          ok: false,
+          error: 'vaccineSlugs invalidos',
+          hint: 'Use os slugs exatos retornados por list_vaccines / recommend_vaccines.',
+        }),
+      };
+    }
+    const validSlugs = knownVaccines.map((v) => v.slug);
+    const missing = vaccineSlugs.filter((s) => !validSlugs.includes(s));
+
+    const expectedValue =
+      typeof expectedValueRaw === 'number' && Number.isFinite(expectedValueRaw)
+        ? expectedValueRaw
+        : knownVaccines.reduce((sum, v) => sum + (v.priceCash ?? 0), 0) || undefined;
+
+    // Import dinamico pra evitar ciclo (functions -> agent -> functions)
+    const { scheduleAppointmentReminders } = await import('./appointmentReminders.js');
+    const { pushAppointmentToGoogle } = await import('./googleCalendar.js');
+
+    try {
+      const created = await prisma.appointment.create({
+        data: {
+          tenantId: ctx.tenantId,
+          patientId: ctx.patientId,
+          conversationId: ctx.conversationId,
+          scheduledFor: when,
+          vaccineSlugs: validSlugs,
+          expectedValue,
+          notes,
+        },
+      });
+
+      // Reminders (idempotente)
+      const reminderCount = await scheduleAppointmentReminders(created.id).catch((err) => {
+        ctx.logger.error({ err, appointmentId: created.id }, 'reminders failed after AI booking');
+        return 0;
+      });
+
+      // Google Calendar (fire-and-forget — se nao conectado, nao faz nada)
+      void pushAppointmentToGoogle(ctx.tenantId, created.id).catch((err) => {
+        ctx.logger.error({ err, appointmentId: created.id }, 'google calendar push failed');
+      });
+
+      ctx.logger.info(
+        { appointmentId: created.id, when: when.toISOString(), slugs: validSlugs },
+        'appointment criado via IA',
+      );
+
+      const whenLabel = when.toLocaleString('pt-BR', {
+        timeZone: 'America/Sao_Paulo',
+        weekday: 'short',
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      return {
+        name: 'register_appointment',
+        output: JSON.stringify({
+          ok: true,
+          appointmentId: created.id,
+          scheduledFor: when.toISOString(),
+          whenLabel,
+          vaccineSlugs: validSlugs,
+          missingSlugs: missing,
+          expectedValue,
+          reminderCount,
+        }),
+      };
+    } catch (err) {
+      ctx.logger.error({ err, args }, 'register_appointment failed');
+      return {
+        name: 'register_appointment',
+        output: JSON.stringify({ ok: false, error: (err as Error).message }),
+      };
+    }
+  },
+
   async request_handoff(args, ctx) {
     const reason = String(args.reason ?? 'patient_request');
     const summary = String(args.summary ?? '').trim() || 'Paciente encaminhado ao atendimento humano.';

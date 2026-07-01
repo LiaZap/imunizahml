@@ -187,6 +187,44 @@ export async function upsertEvent(input: {
   return res.data.id ?? null;
 }
 
+/**
+ * Empurra um Appointment (por id) pro Google Calendar. Busca o appt no banco,
+ * chama upsertEvent, persiste o eventId no metadata. Tolerante a "Google
+ * nao conectado" — nesse caso apenas retorna sem erro.
+ *
+ * Usado por:
+ *  - POST /appointments (dashboard) — cria evento
+ *  - PATCH /appointments/:id — sincroniza mudanca de horario/status
+ *  - tool register_appointment (IA) — agendamento automatico
+ */
+export async function pushAppointmentToGoogle(
+  tenantId: string,
+  appointmentId: string,
+): Promise<void> {
+  const cfg = await loadGoogleConfig(tenantId);
+  if (!cfg) return;
+
+  const appt = await prisma.appointment.findFirst({
+    where: { id: appointmentId, tenantId },
+    include: { patient: { select: { name: true, phone: true } } },
+  });
+  if (!appt) return;
+
+  const meta = (appt.metadata as { googleEventId?: string } | null) ?? {};
+  const eventId = await upsertEvent({
+    tenantId,
+    appointment: appt,
+    existingEventId: meta.googleEventId,
+  });
+
+  if (eventId && eventId !== meta.googleEventId) {
+    await prisma.appointment.update({
+      where: { id: appointmentId },
+      data: { metadata: { ...meta, googleEventId: eventId } as Prisma.InputJsonValue },
+    });
+  }
+}
+
 /** Deleta evento do Google. Tolerante a 404 (já removido). */
 export async function deleteEvent(input: {
   tenantId: string;

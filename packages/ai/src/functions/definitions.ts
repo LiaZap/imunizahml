@@ -116,6 +116,42 @@ export const functionDefinitions: OpenAI.Chat.Completions.ChatCompletionTool[] =
   {
     type: 'function',
     function: {
+      name: 'register_appointment',
+      description:
+        'Cria um agendamento no sistema (banco + Google Calendar + lembretes automáticos). Use QUANDO o paciente já confirmou dia E hora específicos ("segunda 14h", "amanhã 10:30", etc), dentro do horário comercial. Requer nome do paciente registrado. Se o paciente ainda estiver indeciso, negociar horário ou não souber vacina, use `request_handoff` em vez disso.',
+      parameters: {
+        type: 'object',
+        properties: {
+          scheduledFor: {
+            type: 'string',
+            description:
+              'Data e hora do agendamento em formato ISO 8601 com timezone -03:00 (Brasília). Ex: "2026-07-05T14:00:00-03:00". Você MESMO calcula a data absoluta a partir do que o paciente disse (ex: "quinta 14h", "dia 5 às 10:30"), usando currentDate como referência.',
+          },
+          vaccineSlugs: {
+            type: 'array',
+            items: { type: 'string' },
+            description:
+              'Slugs das vacinas do agendamento. Use OS SLUGS EXATOS retornados por list_vaccines / recommend_vaccines (ex: "pneumococica-15", "meningococica-b").',
+          },
+          expectedValue: {
+            type: 'number',
+            description:
+              'Valor total previsto do atendimento em reais. Some os priceCash das vacinas selecionadas. Opcional — se omitir, o sistema soma sozinho.',
+          },
+          notes: {
+            type: 'string',
+            description:
+              'Observações relevantes (ex: "primeira dose", "paciente prefere manhã", "chegar 15min antes"). Opcional.',
+          },
+        },
+        required: ['scheduledFor', 'vaccineSlugs'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
       name: 'request_handoff',
       description:
         'Encaminha o paciente para a equipe humana (fila de agendamento). Use quando o paciente quiser agendar, tiver dúvida que você não pode resolver, ou sintoma preocupante.',

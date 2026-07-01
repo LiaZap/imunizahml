@@ -13,6 +13,7 @@ import { apiGet } from '@/lib/api-server';
 import type { Appointment, PatientDetail, Vaccine } from '@/lib/types';
 import { VaccinationForm } from './vaccination-form';
 import { AppointmentsList } from './appointments-list';
+import { PatientNameEditor } from './name-editor';
 
 function initials(name: string | null, phone: string): string {
   if (name) {
@@ -68,9 +69,7 @@ export default async function PatientDetailPage({
             {initials(patient.name, patient.phone)}
           </div>
           <div>
-            <h1 className="font-display text-2xl font-bold text-slate-900">
-              {patient.name ?? 'Paciente sem nome'}
-            </h1>
+            <PatientNameEditor patientId={patient.id} initialName={patient.name} />
             <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-slate-500">
               <span className="inline-flex items-center gap-1">
                 <Phone className="h-3.5 w-3.5" />
